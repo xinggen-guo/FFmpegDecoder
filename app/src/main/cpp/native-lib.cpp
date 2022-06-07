@@ -2,6 +2,7 @@
 #include <string>
 #include <zlib.h>
 #include <android/log.h>
+#include "audio_decoder_cortroller.h"
 
 const char *TAG = "FFmpegDecorder";
 
@@ -404,8 +405,50 @@ Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobje
     env->ReleaseStringUTFChars(audioInputPath, audioPath);
 }
 
+AudioDecoder *audioDecoder;
+
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_MainActivity_stopAudioTest(JNIEnv *env, jobject thiz) {
     stop = true;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_getMusicMeta(JNIEnv *env, jobject thiz, jstring music_path, jintArray meta_array) {
+    const char* audioPath = env -> GetStringUTFChars(music_path,NULL);
+    jint* metaArray = env -> GetIntArrayElements(meta_array,NULL);
+    audioDecoder = new AudioDecoder();
+    int result = audioDecoder -> initAudioDecoder(audioPath,metaArray);
+    env->ReleaseIntArrayElements(meta_array, metaArray, NULL);
+    env->ReleaseStringUTFChars(music_path, audioPath);
+    return result == 0;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_closeFile(JNIEnv *env, jobject thiz) {
+    if(NULL != audioDecoder) {
+        audioDecoder->destroy();
+        delete audioDecoder;
+        audioDecoder = NULL;
+    }
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_prepareDecoder(JNIEnv *env, jobject thiz) {
+    if(NULL != audioDecoder) {
+        audioDecoder->prepare();
+    }
+}
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_readSamples(JNIEnv *env, jobject thiz, jshortArray samples, jint size) {
+    if(NULL != audioDecoder) {
+        short * samplesArray = env->GetShortArrayElements(samples,NULL);
+        int result = audioDecoder->readSapmles(samplesArray, size);
+        env->ReleaseShortArrayElements(samples, samplesArray, 0);
+        return result;
+    }
 }

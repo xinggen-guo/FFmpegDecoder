@@ -5,13 +5,16 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-include_directories(./ffmpeg/include)
+include_directories(./ffmpeg/include
+        ./)
 
 # Declares and names the project.
 
 #set(FFMPEG_DIR /ffmpeg)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${CMAKE_SOURCE_DIR}/ffmpeg/armeabi-v7a")
+
+file(GLOB_RECURSE native_srcs "${CMAKE_SOURCE_DIR}/*.cpp")
 
 ##ffmpeg 导入
 #add_library(avcodec
@@ -80,6 +83,7 @@ add_library( # Sets the name of the library.
 
         # Sets the library as a shared library.
         SHARED
+        ${native_srcs}
         # Provides a relative path to your source file(s).
         native-lib.cpp)
 
@@ -117,7 +121,12 @@ find_library( # Sets the name of the path variable.
 
 target_link_libraries( # Specifies the target library.
         ffmpegdecoder
-        avformat avcodec avfilter avutil swresample swscale
+        avformat
+        avcodec
+        avfilter
+        avutil
+        swresample
+        swscale
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib}
