@@ -448,6 +448,7 @@ Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_readSamples(JNIE
     if(NULL != audioDecoder) {
         short * samplesArray = env->GetShortArrayElements(samples,NULL);
         int result = audioDecoder->readSapmles(samplesArray, size);
+//        int result = audioDecoder->readSapmlesAndPlay(samplesArray, size,env);
         env->ReleaseShortArrayElements(samples, samplesArray, 0);
         return result;
     }

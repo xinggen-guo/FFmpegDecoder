@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
 import com.audio.study.ffmpegdecoder.databinding.ActivityMainBinding
 import com.audio.study.ffmpegdecoder.utils.FileUtil
+import com.audio.study.ffmpegdecoder.utils.LogUtil
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -14,8 +15,8 @@ class MainActivity : AppCompatActivity() {
 
     private var nativePlayController: NativePlayController? = null
 
-    //                val path = application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "input.mp3"
-    val path = application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "AlizBonita.mp4"
+    val path by lazy { application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "input.mp3" }
+//    val path = application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "AlizBonita.mp4"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         binding.mp3CreateFile.setOnClickListener {
             val path = application.externalCacheDir?.absolutePath + File.separator + "audio_study"
             val result = FileUtil.createOrExistsDir(path)
-            Log.i(TAG,"createResult:${result}---->path:${path}")
+            LogUtil.i(TAG, "createResult:${result}---->path:${path}")
         }
 
 //        binding.audioTrackStart.setOnClickListener {
