@@ -3,6 +3,7 @@
 #include <zlib.h>
 #include <android/log.h>
 #include "audio_decoder_cortroller.h"
+#include "sys/time.h"
 
 const char *TAG = "FFmpegDecorder";
 
@@ -12,6 +13,14 @@ extern "C" {
     #include <libavformat/avformat.h>
     #include <libswresample/swresample.h>
 }
+
+
+long getCurrentTime(){
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_audio_study_ffmpegdecoder_MainActivity_stringFromJNI(
@@ -369,6 +378,7 @@ Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobje
             av_packet_unref(pkt);
 
             for (;;){
+                long currentTime = getCurrentTime();
                 int re = avcodec_receive_frame(codecContext, frame);
                 if (re != 0) {
                     break;
@@ -383,6 +393,8 @@ Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobje
                         resampleOutBuffer = *frame->data;
                     }
 
+                    long duration = getCurrentTime() - currentTime;
+                    __android_log_print(ANDROID_LOG_INFO, TAG, "duration:%d", duration);
                     jbyteArray jPcmDataArray = env->NewByteArray(dataSize);
                     jbyte *jPcmData = env->GetByteArrayElements(jPcmDataArray, NULL);
 
