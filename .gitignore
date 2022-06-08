@@ -118,7 +118,6 @@ hs_err_pid*
 
 # Libraries
 *.lib
-*.a
 *.la
 *.lo
 
