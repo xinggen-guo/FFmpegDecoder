@@ -1,8 +1,9 @@
 //
-// Created by guoxinggen on 2022/6/6.
+// Created by guoxinggen on 2022/6/8.
 //
 
-#include "audio_decoder_cortroller.h"
+
+#include "audio_decoder.h"
 #include <zlib.h>
 #include <jni.h>
 #include <android/log.h>
@@ -82,7 +83,7 @@ void AudioDecoder::prepare() {
     avFrame = av_frame_alloc();
 }
 
-int AudioDecoder::readSapmles(short *pInt,int size) {
+int AudioDecoder::audioDecoder(short *pInt, int size) {
     if (av_read_frame(avFormatContext, avPacket) >= 0) {
         if (avPacket->stream_index == audioIndex) {
             avcodec_send_packet(avCodecContext, avPacket);
@@ -109,69 +110,6 @@ int AudioDecoder::readSapmles(short *pInt,int size) {
         return -1;
     }
 }
-
-int AudioDecoder::readSapmlesAndPlay(short *pInt, int size, _JNIEnv *env) {
-
-    jclass jAudioTrackClass = env->FindClass("android/media/AudioTrack");
-    jmethodID jAudioTrackCMid = env->GetMethodID(jAudioTrackClass,"<init>","(IIIIII)V"); //构造
-
-    //  public static final int STREAM_MUSIC = 3;
-    int streamType = 3;
-    int sampleRateInHz = 44100;
-    // public static final int CHANNEL_OUT_STEREO = (CHANNEL_OUT_FRONT_LEFT | CHANNEL_OUT_FRONT_RIGHT);
-    int channelConfig = (0x4 | 0x8);
-    // public static final int ENCODING_PCM_16BIT = 2;
-    int audioFormat = 2;
-    // getMinBufferSize(int sampleRateInHz, int channelConfig, int audioFormat)
-    jmethodID jGetMinBufferSizeMid = env->GetStaticMethodID(jAudioTrackClass, "getMinBufferSize", "(III)I");
-    int bufferSizeInBytes = env->CallStaticIntMethod(jAudioTrackClass, jGetMinBufferSizeMid, sampleRateInHz, channelConfig, audioFormat);
-    // public static final int MODE_STREAM = 1;
-    int mode = 1;
-
-    //创建了AudioTrack
-    jobject jAudioTrack = env->NewObject(jAudioTrackClass,jAudioTrackCMid, streamType, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes, mode);
-
-    //play方法
-    jmethodID jPlayMid = env->GetMethodID(jAudioTrackClass,"play","()V");
-    env->CallVoidMethod(jAudioTrack,jPlayMid);
-
-    // write method
-    jmethodID jAudioTrackWriteMid = env->GetMethodID(jAudioTrackClass, "write", "([BII)I");
-    uint8_t *resampleOutBuffer = (uint8_t *) malloc(size);
-    while (av_read_frame(avFormatContext, avPacket) >= 0) {
-        if (avPacket->stream_index == audioIndex) {
-            avcodec_send_packet(avCodecContext, avPacket);
-            av_packet_unref(avPacket);
-            for (;;) {
-                int re = avcodec_receive_frame(avCodecContext, avFrame);
-                __android_log_print(ANDROID_LOG_INFO, TAG1, "11111");
-                if (re != 0) {
-                    __android_log_print(ANDROID_LOG_INFO, TAG1, "2222");
-                    break;
-                } else {
-                    __android_log_print(ANDROID_LOG_INFO, TAG1, "33333");
-                    if (swrContext) {
-                        swr_convert(swrContext,
-                                    &resampleOutBuffer, avFrame->nb_samples,
-                                    (const u_int8_t **) avFrame->data, avFrame->nb_samples);
-                    } else {
-                        resampleOutBuffer = *avFrame->data;
-                    }
-                    jbyteArray jPcmDataArray = env->NewByteArray(size);
-                    jbyte *jPcmData = env->GetByteArrayElements(jPcmDataArray, NULL);
-
-                    memcpy(jPcmData, resampleOutBuffer, size);
-
-                    env -> ReleaseByteArrayElements(jPcmDataArray, jPcmData, 0);
-                    env -> CallIntMethod(jAudioTrack, jAudioTrackWriteMid, jPcmDataArray, 0, size);
-                    env -> DeleteLocalRef(jPcmDataArray);
-                }
-            }
-        }
-    }
-    return 0;
-}
-
 
 bool AudioDecoder::audioCodecIsSupported() {
     if (avCodecContext->sample_fmt == AV_SAMPLE_FMT_S16) {

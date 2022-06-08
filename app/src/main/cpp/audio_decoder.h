@@ -1,11 +1,12 @@
 //
-// Created by guoxinggen on 2022/6/6.
+// Created by guoxinggen on 2022/6/8.
 //
 
-#ifndef FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
-#define FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
+#ifndef FFMPEGDECODER_AUDIO_DECODER_H
+#define FFMPEGDECODER_AUDIO_DECODER_H
 
-#include <jni.h>
+
+#include "audio_decoder.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -14,31 +15,27 @@ extern "C" {
 
 
 class AudioDecoder {
-
-public:
+private:
     AVFormatContext *avFormatContext;
     AVCodecContext *avCodecContext;
-
     AVPacket *avPacket;
     AVFrame *avFrame;
-
     SwrContext *swrContext;
-
     int audioIndex = AVERROR_STREAM_NOT_FOUND;
     int sampleRate;
 
+public:
     int initAudioDecoder(const char *string, int *metaArray);
 
     bool audioCodecIsSupported();
 
     void destroy();
 
-    int readSapmles(short *pInt,int size);
+    int audioDecoder(short *pInt, int size);
 
     void prepare();
-
-    int readSapmlesAndPlay(short *pInt, int i, _JNIEnv *pEnv);
 };
 
 
-#endif //FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
+#endif //FFMPEGDECODER_AUDIO_DECODER_H
+
