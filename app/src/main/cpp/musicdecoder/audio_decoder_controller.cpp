@@ -22,7 +22,8 @@ int AudioDecoderController::prepare() {
 int AudioDecoderController::readSapmles(short *samples, int size) {
     int result = 0;
     if(audioQueueData.size() > 0){
-        memcpy(samples, audioQueueData.front(), size);
+        short *dataSamples = audioQueueData.front();
+       memcpy(samples, dataSamples, size);
        audioQueueData.pop();
     }
 

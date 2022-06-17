@@ -5,73 +5,17 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-include_directories(./ffmpeg/include
-        ./)
-
-# Declares and names the project.
-
-#set(FFMPEG_DIR /ffmpeg)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${CMAKE_SOURCE_DIR}/ffmpeg/armeabi-v7a")
+set(MUSIC_DECODER "${CMAKE_SOURCE_DIR}/musicdecoder")
+set(FFMPEG_DIR "${CMAKE_SOURCE_DIR}/ffmpeg")
 
 file(GLOB_RECURSE native_srcs "${CMAKE_SOURCE_DIR}/*.cpp")
+file(GLOB MUSIC_DECODER_CPP "${MUSIC_DECODER}/*.cpp")
 
-##ffmpeg 导入
-#add_library(avcodec
-#        STATIC
-#        IMPORTED)
-#set_target_properties(avcodec
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libavcodec.a)
-#
-#add_library(avdevice
-#        STATIC
-#        IMPORTED)
-#set_target_properties(avdevice
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libavdevice.a)
-#
-#add_library(avformat
-#        STATIC
-#        IMPORTED)
-#set_target_properties(avformat
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libavformat.a)
-#
-#add_library(avutil
-#        STATIC
-#        IMPORTED)
-#set_target_properties(avutil
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libavutil.a)
-#
-#add_library(postproc
-#        STATIC
-#        IMPORTED)
-#set_target_properties(postproc
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libpostproc.a)
-#
-#add_library(swresample
-#        STATIC
-#        IMPORTED)
-#set_target_properties(swresample
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libswresample.a)
-#
-#add_library(swscale
-#        STATIC
-#        IMPORTED)
-#set_target_properties(swscale
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libswscale.a)
-#
-#add_library(avfilter
-#        STATIC
-#        IMPORTED)
-#set_target_properties(avfilter
-#        PROPERTIES IMPORTED_LOCATION
-#        ${FFMPEG_DIR}/armeabi/libavfilter.a)
+include_directories(BEFORE ${CMAKE_SOURCE_DIR}/ffmpeg/include)
+include_directories(${MUSIC_DECODER})
+
+# Declares and names the project.
+project("ffmpegdecoder")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -83,9 +27,10 @@ add_library( # Sets the name of the library.
 
         # Sets the library as a shared library.
         SHARED
+        ${MUSIC_DECODER_CPP}
         ${native_srcs}
         # Provides a relative path to your source file(s).
-        native-lib.cpp)
+        )
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -104,29 +49,16 @@ find_library( # Sets the name of the path variable.
 # can link multiple libraries, such as libraries you define in this
 # build script, prebuilt third-party libraries, or system libraries.
 
-#target_link_libraries( # Specifies the target library.
-#        ffmpegdecoder
-#        ${avfilter}
-#        ${avcodec}
-#        ${avdevice}
-#        ${avformat}
-#        ${avutil}
-#        ${postproc}
-#        ${swresample}
-#        ${swscale}
-#        ${lame}
-#        # Links the target library to the log library
-#        # included in the NDK.
-#        ${log-lib})
-
 target_link_libraries( # Specifies the target library.
         ffmpegdecoder
-        avformat
-        avcodec
-        avfilter
-        avutil
-        swresample
-        swscale
+        ${FFMPEG_DIR}/armeabi-v7a/libavformat.a
+        ${FFMPEG_DIR}/armeabi-v7a/libavcodec.a
+        ${FFMPEG_DIR}/armeabi-v7a/libavfilter.a
+        ${FFMPEG_DIR}/armeabi-v7a/libavdevice.a
+        ${FFMPEG_DIR}/armeabi-v7a/libavutil.a
+        ${FFMPEG_DIR}/armeabi-v7a/libpostproc.a
+        ${FFMPEG_DIR}/armeabi-v7a/libswresample.a
+        ${FFMPEG_DIR}/armeabi-v7a/libswscale.a
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib}

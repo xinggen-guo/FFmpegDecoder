@@ -2,7 +2,7 @@
 #include <string>
 #include <zlib.h>
 #include <android/log.h>
-#include "audio_decoder_controller.h"
+#include "musicdecoder/audio_decoder_controller.h"
 #include "sys/time.h"
 
 const char *TAG = "FFmpegDecorder";
@@ -460,7 +460,6 @@ Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_readSamples(JNIE
     if(NULL != audioDecoderController) {
         short * samplesArray = env->GetShortArrayElements(samples,NULL);
         int result = audioDecoderController->readSapmles(samplesArray, size);
-//        int result = audioDecoder->readSapmlesAndPlay(samplesArray, size,env);
         env->ReleaseShortArrayElements(samples, samplesArray, 0);
         return result;
     }

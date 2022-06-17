@@ -6,8 +6,8 @@
 #define FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
 
 
-#define QUEUE_SIZE_MAX_THRESHOLD 25
-#define QUEUE_SIZE_MIN_THRESHOLD 20
+#define QUEUE_SIZE_MAX_THRESHOLD 30
+#define QUEUE_SIZE_MIN_THRESHOLD 25
 
 #include "audio_decoder.h"
 #include <pthread.h>

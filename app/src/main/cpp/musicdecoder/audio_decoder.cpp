@@ -10,7 +10,7 @@
 
 const char *TAG1 = "AudioDecoderCortronller";
 
-#define LOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGI(...)  __android_log_print(ANDROID_LOG_INFO, TAG1, __VA_ARGS__)
 
 int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
 
@@ -54,16 +54,18 @@ int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
 
     sampleRate = avCodecContext->sample_rate;
 
+//    int dataSize = sampleRate * AV_SAMPLE_FMT_S16 * 2;
     int dataSize = av_samples_get_buffer_size(NULL, av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO) , avCodecContext->frame_size,AV_SAMPLE_FMT_S16, 0);
 
     metaArray[0] = sampleRate;
     metaArray[1] = avCodecContext->bit_rate;
     metaArray[2] = dataSize;
 
+    LOGI("initAudioDecoder---->sampleRate:%1d---->dataSize:%2d---->frame_size:%3d", sampleRate, dataSize, avCodecContext->frame_size);
     //判断需不需要重采样
     if (!audioCodecIsSupported()) {
         swrContext = swr_alloc_set_opts(NULL,
-                                        av_get_default_channel_layout(2), AV_SAMPLE_FMT_S16, sampleRate,
+                                        AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16, sampleRate,
                                         av_get_default_channel_layout(avCodecContext->channel_layout), avCodecContext->sample_fmt, sampleRate,
                                         0, NULL);
         if (!swrContext || swr_init(swrContext)) {
@@ -87,6 +89,7 @@ int AudioDecoder::audioDecoder(short *pInt, int size) {
     if (av_read_frame(avFormatContext, avPacket) >= 0) {
         if (avPacket->stream_index == audioIndex) {
             avcodec_send_packet(avCodecContext, avPacket);
+            LOGI("audioDecoder--->avPacketSize:%d",avPacket->size);
             av_packet_unref(avPacket);
             int re = avcodec_receive_frame(avCodecContext, avFrame);
             if (re != 0) {
