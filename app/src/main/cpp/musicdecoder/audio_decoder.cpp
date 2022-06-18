@@ -53,8 +53,6 @@ int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
 
     sampleRate = avCodecContext->sample_rate;
 
-
-
     metaArray[0] = sampleRate;
     metaArray[1] = avCodecContext->bit_rate;
     int bufferSize = sampleRate * CHANNEL_PER_FRAME
@@ -128,65 +126,40 @@ int AudioDecoder::readSampleData(short *samples, int size) {
 }
 
 int AudioDecoder::readFrame() {
-    LOGI("readFrame enter ::readFrame");
-    int ret = 1;
-    int gotframe = 0;
-    int readFrameCode = -1;
-    while (true) {
-        readFrameCode = av_read_frame(avFormatContext, avPacket);
-        if (readFrameCode >= 0) {
-            if (avPacket->stream_index == audioIndex) {
-                int len = avcodec_decode_audio4(avCodecContext, avFrame,
-                                                &gotframe, avPacket);
-                if (len < 0) {
-                    LOGI("readFrame decode audio error, skip packet---->len:%d",len);
+    LOGI("decoderAudioPacket--0000000");
+    int ret = 0;
+    avPacket = av_packet_alloc();
+    if (av_read_frame(avFormatContext, avPacket) >= 0) {
+        if (avPacket->stream_index == audioIndex) {
+            avcodec_send_packet(avCodecContext, avPacket);
+            LOGI("decoderAudioPacket--->avPacketSize:%d",avPacket->size);
+            av_packet_unref(avPacket);
+            int re = avcodec_receive_frame(avCodecContext, avFrame);
+            LOGI("decoderAudioPacket--111111->re:%1d",re);
+            if (re != 0) {
+                ret = -1;
+            } else {
+                int numChannels = av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
+                int numFrames = 0;
+                int size = av_samples_get_buffer_size(NULL, numChannels, avFrame->nb_samples * numChannels,AV_SAMPLE_FMT_S16, 1);
+                uint8_t *resampleOutBuffer = (uint8_t *) malloc(size);
+                if (swrContext) {
+                    numFrames = swr_convert(swrContext,
+                                            &resampleOutBuffer, avFrame->nb_samples * numChannels,
+                                            (const u_int8_t **) avFrame->data, avFrame->nb_samples);
+                } else {
+                    resampleOutBuffer = *avFrame->data;
+                    numFrames = avFrame->nb_samples;
                 }
-                if (gotframe) {
-                    int numChannels = 2;
-                    int numFrames = 0;
-                    void * audioData;
-                    if (swrContext) {
-                        const int ratio = 2;
-                        const int bufSize = av_samples_get_buffer_size(NULL,
-                                                                       numChannels, avFrame->nb_samples * ratio,
-                                                                       AV_SAMPLE_FMT_S16, 1);
-                        if (!swrBuffer || swrBufferSize < bufSize) {
-                            swrBufferSize = bufSize;
-                            swrBuffer = realloc(swrBuffer, swrBufferSize);
-                        }
-                        byte *outbuf[2] = { (byte*) swrBuffer, NULL };
-                        numFrames = swr_convert(swrContext, outbuf,
-                                                avFrame->nb_samples * ratio,
-                                                (const uint8_t **) avFrame->data,
-                                                avFrame->nb_samples);
-                        if (numFrames < 0) {
-                            LOGI("fail resample audio");
-                            ret = -1;
-                            break;
-                        }
-                        audioData = swrBuffer;
-                    } else {
-                        if (avCodecContext->sample_fmt != AV_SAMPLE_FMT_S16) {
-                            LOGI("bucheck, audio format is invalid");
-                            ret = -1;
-                            break;
-                        }
-                        audioData = avFrame->data[0];
-                        numFrames = avFrame->nb_samples;
-                    }
-                    audioBufferSize = numFrames * numChannels;
-                    audioBuffer = (short*) audioData;
-                    audioBufferCursor = 0;
-                    break;
-                }
+                audioBuffer =  (short*) resampleOutBuffer;
+                audioBufferCursor = 0;
+                audioBufferSize = numFrames * numChannels;
+                LOGI("decoderAudioPacket--33333---->audioBufferSize:%1d---->numFrames:%2d---->size:%3d", audioBufferSize, numFrames, size);
             }
-        } else {
-            ret = -1;
-            break;
         }
     }
-    LOGI("readFrame end ::readFrame");
-    av_free_packet(avPacket);
+    LOGI("decoderAudioPacket--444444");
+    av_packet_free(&avPacket);
     return ret;
 }
 

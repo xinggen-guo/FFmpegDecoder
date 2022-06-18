@@ -376,8 +376,9 @@ Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobje
 
             //清理
             av_packet_unref(pkt);
-
+            __android_log_print(ANDROID_LOG_INFO, TAG, "0000000");
             for (;;){
+                __android_log_print(ANDROID_LOG_INFO, TAG, "111111");
                 long currentTime = getCurrentTime();
                 int re = avcodec_receive_frame(codecContext, frame);
                 if (re != 0) {
