@@ -19,10 +19,6 @@ class NativePlayer {
     private var audioDefaultFormat = AudioFormat.ENCODING_PCM_16BIT
     private var audioDefaultChannel = AudioFormat.CHANNEL_OUT_STEREO
 
-    private val BITS_PER_BYTE = 8
-    private val BITS_PER_CHANNEL = 16
-    private val CHANNEL_PER_FRAME = 2
-
     private var decoderBufferSize = 0
     private var isPlaying = false
     private var isStop = false
@@ -48,8 +44,7 @@ class NativePlayer {
         if (audioDecoder?.initMusicMetaByPath(path, metaArray) == true) {
             sampleRateInHz = metaArray[0]
             avBitRate = metaArray[1]
-            val byteCountPerSec: Int = sampleRateInHz * CHANNEL_PER_FRAME * BITS_PER_CHANNEL / BITS_PER_BYTE
-            decoderBufferSize = (byteCountPerSec / 2 * 0.2).toInt()
+            decoderBufferSize = metaArray[2]
             return true
         }
         return false
