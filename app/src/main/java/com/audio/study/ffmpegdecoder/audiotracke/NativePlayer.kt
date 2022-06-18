@@ -1,6 +1,5 @@
 package com.audio.study.ffmpegdecoder.audiotracke
 
-import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
@@ -15,12 +14,14 @@ class NativePlayer {
     private var audioDecoder: AudioDecoder? = null
 
     private var audioTrack: AudioTrack? = null
-    private var defaultContentTypeMusic = AudioAttributes.CONTENT_TYPE_MUSIC
-
     private var sampleRateInHz = 44100
     private var avBitRate:Int? = null
     private var audioDefaultFormat = AudioFormat.ENCODING_PCM_16BIT
     private var audioDefaultChannel = AudioFormat.CHANNEL_OUT_STEREO
+
+    private val BITS_PER_BYTE = 8
+    private val BITS_PER_CHANNEL = 16
+    private val CHANNEL_PER_FRAME = 2
 
     private var decoderBufferSize = 0
     private var isPlaying = false
@@ -38,11 +39,8 @@ class NativePlayer {
     }
 
     private fun initAudioTrack(){
-//        val audioAttributes = AudioAttributes.Builder().setContentType(defaultContentTypeMusic).build()
         val bufferSizeInBytes = AudioTrack.getMinBufferSize(sampleRateInHz, audioDefaultChannel, audioDefaultFormat)
-//        val avFormat = AudioFormat.Builder().setSampleRate(sampleRateInHz).setChannelMask(audioDefaultChannel).build()
-//        audioTrack = AudioTrack(audioAttributes, avFormat, bufferSizeInBytes, AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE)
-        audioTrack = AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz, audioDefaultChannel, AudioFormat.ENCODING_PCM_16BIT, bufferSizeInBytes, AudioTrack.MODE_STREAM)
+        audioTrack = AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz, audioDefaultChannel, audioDefaultFormat, bufferSizeInBytes, AudioTrack.MODE_STREAM)
     }
 
     private fun initMetaData(path: String): Boolean {
@@ -50,7 +48,8 @@ class NativePlayer {
         if (audioDecoder?.initMusicMetaByPath(path, metaArray) == true) {
             sampleRateInHz = metaArray[0]
             avBitRate = metaArray[1]
-            decoderBufferSize = metaArray[2]
+            val byteCountPerSec: Int = sampleRateInHz * CHANNEL_PER_FRAME * BITS_PER_CHANNEL / BITS_PER_BYTE
+            decoderBufferSize = (byteCountPerSec / 2 * 0.2).toInt()
             return true
         }
         return false
@@ -97,29 +96,25 @@ class NativePlayer {
             var duration:Long? = null
             try {
                 while (!isStop) {
-//                    val needDataSize = decoderBufferSize * 3
-//                    var currentSize = 0
-//                    var listSample = mutableListOf<Short>()
-//                    val samples: ShortArray = ShortArray(decoderBufferSize)
-//                    duration = System.currentTimeMillis()
-//                    while (currentSize < needDataSize){
-//                        val result = audioDecoder?.readSamples(samples)
-//                        if(result == -1){
-//                            isStop = true
-//                            isPlaying = false
-//                            break
-//                        }
-//                        listSample.addAll(samples.toList())
-//                        currentSize = listSample.size
-//                    }
+                    LogUtil.i(TAG, "PlayThread--->need_data")
                     duration = System.currentTimeMillis()
-                    val result = audioDecoder?.readSamples(samples)
-                    if(result == -1){
+                    val sampleCount = audioDecoder?.readSamples(samples)
+                    LogUtil.i(TAG, "PlayThread---->sampleCount:${sampleCount}")
+                    if (sampleCount == -2) {
+                        try {
+                            Thread.sleep(10)
+                        } catch (e: InterruptedException) {
+                            e.printStackTrace()
+                        }
+                        LogUtil.i("WARN : no play data")
+                        continue
+                    }
+                    if(sampleCount == -1){
                         isStop = true
                         isPlaying = false
                         break
                     }
-                    LogUtil.i(TAG, "duration:${System.currentTimeMillis() - duration}")
+                    LogUtil.i(TAG, "duration:${System.currentTimeMillis() - duration}----->decoderBufferSize:${decoderBufferSize}")
                     while (true) {
                         synchronized(NativePlayer::class.java) {
                             isPlayTemp = isPlaying
@@ -131,8 +126,7 @@ class NativePlayer {
 
                     }
                     if (audioTrack?.state != AudioTrack.STATE_UNINITIALIZED) {
-//                        audioTrack?.write(listSample.toShortArray(), 0, listSample.size)
-                        audioTrack?.write(samples, 0, samples.size)
+                        audioTrack?.write(samples, 0, sampleCount!!)
                     }
                 }
             }catch (e:Exception){

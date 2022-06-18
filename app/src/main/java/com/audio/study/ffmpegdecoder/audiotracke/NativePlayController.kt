@@ -13,7 +13,6 @@ class NativePlayController {
     }
 
     fun start(){
-        nativePlayer.prepare()
         nativePlayer.play()
     }
 

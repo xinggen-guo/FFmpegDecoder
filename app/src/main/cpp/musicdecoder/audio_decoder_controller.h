@@ -13,13 +13,15 @@
 #include <pthread.h>
 #include <queue>
 
+#define LOG_TAG "AudioDecoderController"
+
 class AudioDecoderController{
     /** 伴奏的解码器 **/
     private:
         AudioDecoder* audioDecoder;
         pthread_t audioDecoderThread;
 
-        std::queue<short *> audioQueueData;
+        std::queue<AudioPacket*> audioQueueData;
 
         bool isRunning;
         pthread_mutex_t mLock;
@@ -28,7 +30,7 @@ class AudioDecoderController{
         static void* startDecoderThread(void* ptr);
         /** 开启解码线程 **/
         virtual void initDecoderThread();
-        virtual int decodeSongPacket();
+        void decodeSongPacket();
         /** 销毁解码线程 **/
         virtual void destroyDecoderThread();
 
