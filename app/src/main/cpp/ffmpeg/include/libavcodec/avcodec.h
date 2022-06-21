@@ -1538,7 +1538,7 @@ typedef struct AVCodecContext {
      * extra_codec_tag + size could be added but for this a clear advantage must be demonstrated
      * first.
      * - encoding: Set by user, if not then the default based on codec_id will be used.
-     * - decoding: Set by user, will be converted to uppercase by libavcodec during init.
+     * - decoding: Set by user, will be converted to uppercase by libavcodec during getMusicMeta.
      */
     unsigned int codec_tag;
 
@@ -3461,7 +3461,7 @@ typedef struct AVCodec {
      */
     /**
      * If defined, called on thread contexts when they are created.
-     * If the codec allocates writable tables in init(), re-allocate them here.
+     * If the codec allocates writable tables in getMusicMeta(), re-allocate them here.
      * priv_data will be set to a copy of the original.
      */
     int (*init_thread_copy)(AVCodecContext *);
@@ -3729,7 +3729,7 @@ typedef struct AVHWAccel {
      * from get_format. Refer to avcodec_get_hw_frames_parameters() for
      * details.
      *
-     * This CAN be called before AVHWAccel.init is called, and you must assume
+     * This CAN be called before AVHWAccel.getMusicMeta is called, and you must assume
      * that avctx->hwaccel_priv_data is invalid.
      */
     int (*frame_params)(AVCodecContext *avctx, AVBufferRef *hw_frames_ctx);

@@ -11,7 +11,7 @@
 #include <exception>
 #include <iostream>
 
-int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
+int AudioDecoder::initAudioDecoder(const char *string) {
 
     int result = 0;
 
@@ -52,13 +52,10 @@ int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
     }
 
     sampleRate = avCodecContext->sample_rate;
-
-    metaArray[0] = sampleRate;
-    metaArray[1] = avCodecContext->bit_rate;
     int bufferSize = sampleRate * CHANNEL_PER_FRAME
                                    * BITS_PER_CHANNEL / BITS_PER_BYTE;
     packetBufferSize = bufferSize / 2 * 0.2;
-    metaArray[2] = packetBufferSize;
+    duration = avFormatContext->duration;
 
     LOGI("initAudioDecoder---->sampleRate:%1d---->packetBufferSize:%2d---->frame_size:%3d", sampleRate, packetBufferSize, avCodecContext->frame_size);
     //判断需不需要重采样
@@ -77,6 +74,18 @@ int AudioDecoder::initAudioDecoder(const char *string, int *metaArray) {
     }
 
     return result;
+}
+
+int AudioDecoder::getSampleRate() {
+    return sampleRate;
+}
+
+int AudioDecoder::getDuration() {
+    return duration;
+}
+
+int AudioDecoder::getPacketBufferSize() {
+    return packetBufferSize;
 }
 
 void AudioDecoder::prepare() {
@@ -157,6 +166,8 @@ int AudioDecoder::readFrame() {
                 LOGI("decoderAudioPacket--33333---->audioBufferSize:%1d---->numFrames:%2d---->size:%3d", audioBufferSize, numFrames, size);
             }
         }
+    } else {
+        ret = -1;
     }
     LOGI("decoderAudioPacket--444444");
     av_packet_free(&avPacket);
@@ -171,21 +182,25 @@ bool AudioDecoder::audioCodecIsSupported() {
 }
 
 void AudioDecoder::destroy() {
-
     if(NULL != swrContext) {
         swr_close(swrContext);
         swr_free(&swrContext);
         swrContext = NULL;
     }
+    if (NULL != avPacket) {
+        av_packet_free(&avPacket);
+        avPacket = NULL;
+    }
+    if (NULL != avFrame) {
+        av_frame_free(&avFrame);
+        avFrame = NULL;
+    }
     if(NULL != avCodecContext) {
         avcodec_close(avCodecContext);
-        avcodec_free_context(&avCodecContext);
         avCodecContext = NULL;
     }
-
     if(NULL != avFormatContext) {
         avformat_close_input(&avFormatContext);
-        avformat_free_context(avFormatContext);
         avFormatContext = NULL;
     }
 }

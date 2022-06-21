@@ -56,7 +56,7 @@ typedef struct AVD3D11VADeviceContext {
     ID3D11Device        *device;
 
     /**
-     * If unset, this will be set from the device field on init.
+     * If unset, this will be set from the device field on getMusicMeta.
      *
      * Deallocating the AVHWDeviceContext will always release this interface,
      * and it does not matter whether it was user-allocated.
@@ -64,7 +64,7 @@ typedef struct AVD3D11VADeviceContext {
     ID3D11DeviceContext *device_context;
 
     /**
-     * If unset, this will be set from the device field on init.
+     * If unset, this will be set from the device field on getMusicMeta.
      *
      * Deallocating the AVHWDeviceContext will always release this interface,
      * and it does not matter whether it was user-allocated.
@@ -72,7 +72,7 @@ typedef struct AVD3D11VADeviceContext {
     ID3D11VideoDevice   *video_device;
 
     /**
-     * If unset, this will be set from the device_context field on init.
+     * If unset, this will be set from the device_context field on getMusicMeta.
      *
      * Deallocating the AVHWDeviceContext will always release this interface,
      * and it does not matter whether it was user-allocated.
@@ -85,7 +85,7 @@ typedef struct AVD3D11VADeviceContext {
      * texture (for av_hwframe_transfer_data() calls). They do NOT protect
      * access to hwcontext or decoder state in general.
      *
-     * If unset on init, the hwcontext implementation will set them to use an
+     * If unset on getMusicMeta, the hwcontext implementation will set them to use an
      * internal mutex.
      *
      * The underlying lock must be recursive. lock_ctx is for free use by the
@@ -131,7 +131,7 @@ typedef struct AVD3D11FrameDescriptor {
 typedef struct AVD3D11VAFramesContext {
     /**
      * The canonical texture used for pool allocation. If this is set to NULL
-     * on init, the hwframes implementation will allocate and set an array
+     * on getMusicMeta, the hwframes implementation will allocate and set an array
      * texture if initial_pool_size > 0.
      *
      * The only situation when the API user should set this is:

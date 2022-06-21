@@ -8,8 +8,8 @@ interface AudioDecoder {
 
     fun readSamples(samples: ShortArray): Int
 
-    fun initMusicMetaByPath(musicPath: String, metaArray: IntArray):Boolean
+    fun getMusicMetaByPath(musicPath: String, metaArray: IntArray):Boolean
 
-    fun prepare()
+    fun prepare(musicPath: String)
 
 }

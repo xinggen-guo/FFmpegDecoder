@@ -20,9 +20,7 @@ class AudioDecoderController{
     private:
         AudioDecoder* audioDecoder;
         pthread_t audioDecoderThread;
-
         std::queue<AudioPacket*> audioQueueData;
-
         bool isRunning;
         pthread_mutex_t mLock;
         pthread_cond_t mCondition;
@@ -36,12 +34,13 @@ class AudioDecoderController{
 
     public:
         int dataSize;
-        int init(const char *audioPath, int *metaArray);
-        int prepare();
+        int getMusicMeta(const char *audioPath, int *metaArray);
+        int prepare(const char *audioPath);
 
     void destroy();
 
     int readSapmles(short *pInt, int i);
+
 };
 
 

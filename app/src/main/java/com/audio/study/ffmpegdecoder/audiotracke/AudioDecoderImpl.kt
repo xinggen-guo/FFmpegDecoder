@@ -14,12 +14,12 @@ class AudioDecoderImpl : AudioDecoder {
         return readSamples(samples,samples.size)
     }
 
-    override fun initMusicMetaByPath(musicPath: String, metaArray: IntArray): Boolean {
+    override fun getMusicMetaByPath(musicPath: String, metaArray: IntArray): Boolean {
         return getMusicMeta(musicPath, metaArray)
     }
 
-    override fun prepare() {
-        prepareDecoder()
+    override fun prepare(musicPath: String) {
+        prepareDecoder(musicPath)
     }
 
     private external fun getMusicMeta(musicPath: String, metaArray: IntArray): Boolean
@@ -28,5 +28,5 @@ class AudioDecoderImpl : AudioDecoder {
 
     private external fun closeFile()
 
-    private external fun prepareDecoder()
+    private external fun prepareDecoder(musicPath: String)
 }

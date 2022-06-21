@@ -5,17 +5,22 @@
 #include <CommonTools.h>
 #include "audio_decoder_controller.h"
 
-int AudioDecoderController::init(const char *audioPath, int *metaArray) {
+int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) {
     int result = 0;
     audioDecoder = new AudioDecoder();
-    result = audioDecoder->initAudioDecoder(audioPath,metaArray);
-    LOGI("init---->result:%1d", result);
+    result = audioDecoder->initAudioDecoder(audioPath);
+    metaArray[0] = audioDecoder->getSampleRate();
+    metaArray[1] = audioDecoder->getPacketBufferSize();
+    audioDecoder->destroy();
+    LOGI("getMusicMeta---->result:%1d", result);
     return result;
 }
 
-int AudioDecoderController::prepare() {
+int AudioDecoderController::prepare(const char *audioPath) {
     LOGI("prepare");
     int result = 0;
+    audioDecoder = new AudioDecoder();
+    result = audioDecoder->initAudioDecoder(audioPath);
     audioDecoder->prepare();
     initDecoderThread();
     return result;
@@ -83,8 +88,11 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
 }
 
 void AudioDecoderController::decodeSongPacket() {
+    LOGI("decodeSongPacket----->start");
     AudioPacket* audioPacket = audioDecoder->decoderAudioPacket();
+    LOGI("decodeSongPacket----->data");
     audioQueueData.push(audioPacket);
+    LOGI("decodeSongPacket----->end");
 }
 
 void AudioDecoderController::destroyDecoderThread() {

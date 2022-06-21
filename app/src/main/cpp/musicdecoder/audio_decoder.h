@@ -29,7 +29,6 @@ typedef struct AudioPacket{
         audioBuffer = NULL;
         audioSize = 0;
     }
-
     ~AudioPacket(){
         if (NULL != audioBuffer) {
             delete[] audioBuffer;
@@ -52,6 +51,7 @@ private:
     int audioIndex = AVERROR_STREAM_NOT_FOUND;
     int sampleRate;
     int packetBufferSize;
+    int duration;
 
     /** 解码数据 **/
     short* audioBuffer;
@@ -59,7 +59,7 @@ private:
     int audioBufferSize;
 
 public:
-    int initAudioDecoder(const char *string, int *metaArray);
+    int initAudioDecoder(const char *string);
     bool audioCodecIsSupported();
     void destroy();
     void prepare();
@@ -67,6 +67,9 @@ public:
     int readSampleData(short *pInt, int size);
 
     int readFrame();
+    int getDuration();
+    int getSampleRate();
+    int getPacketBufferSize();
 };
 
 

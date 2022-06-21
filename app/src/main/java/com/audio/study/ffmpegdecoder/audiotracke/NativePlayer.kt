@@ -4,6 +4,8 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import com.audio.study.ffmpegdecoder.utils.LogUtil
+import java.lang.IllegalArgumentException
+import java.lang.NullPointerException
 
 class NativePlayer {
 
@@ -13,11 +15,13 @@ class NativePlayer {
 
     private var audioDecoder: AudioDecoder? = null
 
+    private var playPath:String? = null
     private var audioTrack: AudioTrack? = null
     private var sampleRateInHz = 44100
-    private var avBitRate:Int? = null
     private var audioDefaultFormat = AudioFormat.ENCODING_PCM_16BIT
     private var audioDefaultChannel = AudioFormat.CHANNEL_OUT_STEREO
+
+    private var duration = 0L
 
     private var decoderBufferSize = 0
     private var isPlaying = false
@@ -26,6 +30,8 @@ class NativePlayer {
     private var playerThread: Thread? = null
 
     fun setDataSource(path: String): Boolean {
+        LogUtil.i("setDataSource")
+        this.playPath = path
         audioDecoder = AudioDecoderImpl()
         if (initMetaData(path)) {
             isPlaying = false
@@ -35,24 +41,36 @@ class NativePlayer {
     }
 
     private fun initAudioTrack(){
+        LogUtil.i("initAudioTrack---->sampleRateInHz:${sampleRateInHz}---->audioDefaultChannel:${audioDefaultChannel}--->audioDefaultFormat:${audioDefaultFormat}")
         val bufferSizeInBytes = AudioTrack.getMinBufferSize(sampleRateInHz, audioDefaultChannel, audioDefaultFormat)
+        LogUtil.i("bufferSizeInBytes:${bufferSizeInBytes}")
         audioTrack = AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz, audioDefaultChannel, audioDefaultFormat, bufferSizeInBytes, AudioTrack.MODE_STREAM)
     }
 
     private fun initMetaData(path: String): Boolean {
-        val metaArray = intArrayOf(0, 0, 0)
-        if (audioDecoder?.initMusicMetaByPath(path, metaArray) == true) {
+        LogUtil.i("initMetaData")
+        val metaArray = intArrayOf(0, 0)
+        if (audioDecoder?.getMusicMetaByPath(path, metaArray) == true) {
             sampleRateInHz = metaArray[0]
-            avBitRate = metaArray[1]
-            decoderBufferSize = metaArray[2]
+            if(sampleRateInHz  <= 0){
+                throw IllegalArgumentException("sampleRateInHz < 0")
+            }
+            decoderBufferSize = metaArray[1]
+            if(decoderBufferSize  <= 0){
+                throw IllegalArgumentException("decoderBufferSize < 0")
+            }
+            LogUtil.i("sampleRateInHz:${sampleRateInHz}---->decoderBufferSize:${decoderBufferSize}")
             return true
         }
         return false
     }
 
     fun prepare() {
+        LogUtil.i("prepare")
+        playPath ?: throw NullPointerException("playPath is null")
+        audioDecoder?.prepare(playPath!!)
         initAudioTrack()
-        audioDecoder?.prepare()
+        LogUtil.i("audioDecoder--->prepare")
         startPlayerThread()
     }
 
