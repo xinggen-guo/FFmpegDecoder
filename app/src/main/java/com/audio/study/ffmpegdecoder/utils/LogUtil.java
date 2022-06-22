@@ -6,7 +6,7 @@ import android.util.Log;
 
 public final class LogUtil {
 
-    private static final String TAG = "StarMaker";
+    private static final String TAG = "FFmpegDecoder";
     /** Debug开关 */
     public static final boolean DEBUG = true;
 
