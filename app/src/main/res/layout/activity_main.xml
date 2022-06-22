@@ -19,11 +19,12 @@
     <Button
         android:id="@+id/mp3CreateFile"
         android:layout_width="0dp"
+        android:layout_height="50dp"
         android:text="mp3CreateFile"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_height="50dp"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
 
     <Button
         android:id="@+id/audio_track_start"
@@ -38,5 +39,31 @@
         android:layout_height="wrap_content"
         android:text="audioTrackEnd"
         app:layout_constraintTop_toBottomOf="@id/audio_track_start" />
+
+
+    <androidx.appcompat.widget.AppCompatSeekBar
+        android:id="@+id/audio_progress"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        app:layout_constraintTop_toBottomOf="@id/audio_track_end" />
+
+    <TextView
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:text="00:00"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/audio_progress" />
+
+
+    <TextView
+        android:id="@+id/duration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="10dp"
+        android:text="00:00"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/audio_progress" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

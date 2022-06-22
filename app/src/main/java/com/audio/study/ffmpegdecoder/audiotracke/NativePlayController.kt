@@ -20,4 +20,12 @@ class NativePlayController {
         nativePlayer.stop()
     }
 
+    fun getDuration(): Int {
+        return nativePlayer.getDuration()
+    }
+
+    fun getProgress(): Int {
+        return nativePlayer.getProgress()
+    }
+
 }

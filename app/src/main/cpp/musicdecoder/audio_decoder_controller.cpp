@@ -11,8 +11,8 @@ int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) 
     result = audioDecoder->initAudioDecoder(audioPath);
     metaArray[0] = audioDecoder->getSampleRate();
     metaArray[1] = audioDecoder->getPacketBufferSize();
+    metaArray[2] = audioDecoder->getDuration();
     audioDecoder->destroy();
-    LOGI("getMusicMeta---->result:%1d", result);
     return result;
 }
 
@@ -26,14 +26,19 @@ int AudioDecoderController::prepare(const char *audioPath) {
     return result;
 }
 
+int AudioDecoderController::getProgress() {
+    return progress;
+}
+
 int AudioDecoderController::readSapmles(short *samples, int size) {
     LOGI("readSapmles----->size:%d",size);
     int result = 0;
     if(audioQueueData.size() > 0){
         AudioPacket *audioPacket = audioQueueData.front();
-        LOGI("audioPacket----->audioPacketSize:%d",audioPacket->audioSize);
         short *dataSamples = audioPacket->audioBuffer;
         memcpy(samples, dataSamples, audioPacket->audioSize * 2);
+        progress = audioPacket->startPosition;
+        LOGI("audioPacket----->audioPacketSize:%1d--->progress:%2d", audioPacket->audioSize, progress);
         audioQueueData.pop();
         result = audioPacket->audioSize;
         delete audioPacket;

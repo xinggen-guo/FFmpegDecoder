@@ -12,4 +12,6 @@ interface AudioDecoder {
 
     fun prepare(musicPath: String)
 
+    fun getProgress(): Int?
+
 }

@@ -25,14 +25,20 @@ typedef unsigned char byte;
 typedef struct AudioPacket{
     short *audioBuffer;
     int audioSize;
+    float duration;
+    float startPosition;
     AudioPacket(){
         audioBuffer = NULL;
         audioSize = 0;
+        duration = 0;
+        startPosition = 0;
     }
     ~AudioPacket(){
         if (NULL != audioBuffer) {
             delete[] audioBuffer;
             audioSize = 0;
+            duration = 0;
+            startPosition = 0;
         }
     }
 } AudioPacket;
@@ -45,18 +51,19 @@ private:
     AVPacket *avPacket;
     AVFrame *avFrame;
     SwrContext *swrContext;
-    void *swrBuffer;
-    int swrBufferSize;
 
     int audioIndex = AVERROR_STREAM_NOT_FOUND;
     int sampleRate;
     int packetBufferSize;
     int duration;
+    float time_base;
 
     /** 解码数据 **/
     short* audioBuffer;
     int audioBufferCursor;
     int audioBufferSize;
+    float audioDuration;
+    float audioStartPosition;
 
 public:
     int initAudioDecoder(const char *string);

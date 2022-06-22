@@ -41,6 +41,7 @@ int AudioDecoder::initAudioDecoder(const char *string) {
 
     AVStream *audioStream = avFormatContext->streams[audioIndex];
 
+    time_base = av_q2d(audioStream->time_base);
     avCodecContext = audioStream->codec;
     AVCodec *avCodec = avcodec_find_decoder(avCodecContext->codec_id);
     if (avCodec == NULL) {
@@ -55,9 +56,10 @@ int AudioDecoder::initAudioDecoder(const char *string) {
     int bufferSize = sampleRate * CHANNEL_PER_FRAME
                                    * BITS_PER_CHANNEL / BITS_PER_BYTE;
     packetBufferSize = bufferSize / 2 * 0.2;
-    duration = avFormatContext->duration;
 
-    LOGI("initAudioDecoder---->sampleRate:%1d---->packetBufferSize:%2d---->frame_size:%3d", sampleRate, packetBufferSize, avCodecContext->frame_size);
+    duration = avFormatContext->duration / AV_TIME_BASE;
+
+    LOGI("initAudioDecoder---->sampleRate:%1d---->packetBufferSize:%2d---->frame_size:%3d--->duration:%4d", sampleRate, packetBufferSize, avCodecContext->frame_size,duration);
     //判断需不需要重采样
     if (!audioCodecIsSupported()) {
         swrContext = swr_alloc_set_opts(NULL,
@@ -94,12 +96,16 @@ void AudioDecoder::prepare() {
 }
 
 AudioPacket* AudioDecoder::decoderAudioPacket() {
+    audioDuration = 0;
+    audioStartPosition = 0;
     short *resample = new short[packetBufferSize];
     int stereoSampleSize = readSampleData(resample, packetBufferSize);
     AudioPacket *audioPacket = new AudioPacket();
     if (stereoSampleSize > 0) {
         audioPacket->audioBuffer = resample;
         audioPacket->audioSize = stereoSampleSize;
+        audioPacket->duration = audioDuration;
+        audioPacket->startPosition = audioStartPosition;
     } else {
         audioPacket->audioSize = -1;
     }
@@ -163,7 +169,11 @@ int AudioDecoder::readFrame() {
                 audioBuffer =  (short*) resampleOutBuffer;
                 audioBufferCursor = 0;
                 audioBufferSize = numFrames * numChannels;
-                LOGI("decoderAudioPacket--33333---->audioBufferSize:%1d---->numFrames:%2d---->size:%3d", audioBufferSize, numFrames, size);
+                audioDuration += av_frame_get_pkt_duration(avFrame) * time_base;
+                if(audioStartPosition == 0) {
+                    audioStartPosition = avFrame->pts * time_base;
+                }
+                LOGI("decoderAudioPacket--33333---->audioBufferSize:%1d---->audioDuration:%2f--->audioStartPosition:%3f", audioBufferSize, audioDuration, audioStartPosition);
             }
         }
     } else {

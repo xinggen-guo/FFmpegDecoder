@@ -24,6 +24,7 @@ class AudioDecoderController{
         bool isRunning;
         pthread_mutex_t mLock;
         pthread_cond_t mCondition;
+        int progress;
 
         static void* startDecoderThread(void* ptr);
         /** 开启解码线程 **/
@@ -36,6 +37,7 @@ class AudioDecoderController{
         int dataSize;
         int getMusicMeta(const char *audioPath, int *metaArray);
         int prepare(const char *audioPath);
+        int getProgress();
 
     void destroy();
 

@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">FFmpegDecoder</string>
+
+    <!-- 时间单位:秒,复数 seconds in plural, don't translate '%1$s'-->
+    <string name="time_format_seconds">%1$ssecs</string>
+    <!-- 时间单位:分钟,复数minutes in singular -->
+    <string name="time_format_one_minute">1min</string>
+    <!-- 时间单位:分钟,复数minutes in plural, don't translate '%1$s' -->
+    <string name="time_format_minutes">%1$smins</string>
+    <!-- 1分几秒, minute in singular and seconds  in plural, don't translate '%1$s'-->
+    <string name="time_format_one_minute_multi_seconds">1min%1$ssecs</string>
+    <!-- 几分几秒, minutes in plural and seconds in plural, don't translate '%1$s' and '%2$s' -->
+    <string name="time_format_multi_minutes_multi_seconds">%1$smins%2$ssecs</string>
+
+    <!-- 时间单位:分钟,复数minutes in plural, don't translate '%1$s' -->
+    <string name="time_format_minute">%1$smin</string>
+    <!-- 几分几秒, minutes in plural and seconds in plural, don't translate '%1$s' and '%2$s' -->
+    <string name="time_format_multi_minute_multi_second">%1$smin%2$ssec</string>
 </resources>

@@ -22,6 +22,12 @@ class AudioDecoderImpl : AudioDecoder {
         prepareDecoder(musicPath)
     }
 
+    override fun getProgress(): Int? {
+        return nativeGetProgress()
+    }
+
+    private external fun nativeGetProgress(): Int
+
     private external fun getMusicMeta(musicPath: String, metaArray: IntArray): Boolean
 
     private external fun readSamples(samples: ShortArray, size: Int): Int

@@ -21,7 +21,7 @@ class NativePlayer {
     private var audioDefaultFormat = AudioFormat.ENCODING_PCM_16BIT
     private var audioDefaultChannel = AudioFormat.CHANNEL_OUT_STEREO
 
-    private var duration = 0L
+    private var duration = 0
 
     private var decoderBufferSize = 0
     private var isPlaying = false
@@ -49,7 +49,7 @@ class NativePlayer {
 
     private fun initMetaData(path: String): Boolean {
         LogUtil.i("initMetaData")
-        val metaArray = intArrayOf(0, 0)
+        val metaArray = intArrayOf(0, 0, 0)
         if (audioDecoder?.getMusicMetaByPath(path, metaArray) == true) {
             sampleRateInHz = metaArray[0]
             if(sampleRateInHz  <= 0){
@@ -59,6 +59,7 @@ class NativePlayer {
             if(decoderBufferSize  <= 0){
                 throw IllegalArgumentException("decoderBufferSize < 0")
             }
+            duration = metaArray[2]
             LogUtil.i("sampleRateInHz:${sampleRateInHz}---->decoderBufferSize:${decoderBufferSize}")
             return true
         }
@@ -99,6 +100,14 @@ class NativePlayer {
             isPlaying = false
             isStop = true
         }
+    }
+
+    fun getDuration(): Int {
+        return duration
+    }
+
+    fun getProgress(): Int {
+        return audioDecoder?.getProgress() ?: 0
     }
 
     inner class PlayThread : Runnable {
