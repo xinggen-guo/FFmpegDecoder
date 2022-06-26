@@ -13,31 +13,46 @@
 #include <pthread.h>
 #include <queue>
 
-#define LOG_TAG "AudioDecoderController"
+#define LOG_TAG "AudioDecoderControllerLog"
 
 class AudioDecoderController{
     /** 伴奏的解码器 **/
-    private:
-        AudioDecoder* audioDecoder;
-        pthread_t audioDecoderThread;
-        std::queue<AudioPacket*> audioQueueData;
-        bool isRunning;
-        pthread_mutex_t mLock;
-        pthread_cond_t mCondition;
-        int progress;
+private:
+    AudioDecoder *audioDecoder;
+    pthread_t audioDecoderThread;
+    std::queue<AudioPacket *> audioQueueData;
+    bool isRunning;
+    pthread_mutex_t mLock;
+    pthread_cond_t mCondition;
+    int progress;
+    long seekTime;
+    bool needSeek;
 
-        static void* startDecoderThread(void* ptr);
-        /** 开启解码线程 **/
-        virtual void initDecoderThread();
-        void decodeSongPacket();
-        /** 销毁解码线程 **/
-        virtual void destroyDecoderThread();
+    static void *startDecoderThread(void *ptr);
 
-    public:
-        int dataSize;
-        int getMusicMeta(const char *audioPath, int *metaArray);
-        int prepare(const char *audioPath);
-        int getProgress();
+    /** 开启解码线程 **/
+    virtual void initDecoderThread();
+
+    void decodeSongPacket();
+
+    /** 销毁解码线程 **/
+    virtual void destroyDecoderThread();
+
+public:
+    int dataSize;
+
+    int getMusicMeta(const char *audioPath, int *metaArray);
+
+    int prepare(const char *audioPath);
+
+    void seek(const long seek_time);
+
+    int getProgress();
+
+    AudioDecoderController() {
+        needSeek = false;
+        seekTime = 0;
+    }
 
     void destroy();
 

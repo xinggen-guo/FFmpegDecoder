@@ -49,7 +49,13 @@ Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_readSamples(JNIE
     }
 }
 
-
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_nativeSeekPlay(JNIEnv *env, jobject thiz, jlong seek_position) {
+    if(NULL != audioDecoderController){
+        audioDecoderController->seek(seek_position);
+    }
+}
 
 extern "C"
 JNIEXPORT jint JNICALL

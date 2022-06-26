@@ -19,7 +19,7 @@ extern "C" {
 #define BITS_PER_CHANNEL		16
 #define BITS_PER_BYTE		8
 
-#define LOG_TAG "AudioDecoder"
+#define LOG_TAG "AudioDecoderLog"
 
 typedef unsigned char byte;
 typedef struct AudioPacket{
@@ -65,6 +65,10 @@ private:
     float audioDuration;
     float audioStartPosition;
 
+    /** seek **/
+    bool need_seek = false;
+    long time_seek;
+
 public:
     int initAudioDecoder(const char *string);
     bool audioCodecIsSupported();
@@ -72,11 +76,12 @@ public:
     void prepare();
     AudioPacket* decoderAudioPacket();
     int readSampleData(short *pInt, int size);
-
     int readFrame();
     int getDuration();
     int getSampleRate();
     int getPacketBufferSize();
+    void seek(const long seek_time);
+    void seekFrame();
 };
 
 

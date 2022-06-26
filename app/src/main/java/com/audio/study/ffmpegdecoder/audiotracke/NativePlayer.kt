@@ -26,8 +26,15 @@ class NativePlayer {
     private var decoderBufferSize = 0
     private var isPlaying = false
     private var isStop = false
+    private var isSeekData = false
 
     private var playerThread: Thread? = null
+
+    private var listener: OnPlayListener? = null
+
+    fun setPlayListener(onPlayListener: OnPlayListener?){
+        this.listener = onPlayListener
+    }
 
     fun setDataSource(path: String): Boolean {
         LogUtil.i("setDataSource")
@@ -40,10 +47,14 @@ class NativePlayer {
         return true
     }
 
+    fun seek(seekPosition:Long){
+        isSeekData = true
+        audioDecoder?.seek(seekPosition)
+    }
+
     private fun initAudioTrack(){
         LogUtil.i("initAudioTrack---->sampleRateInHz:${sampleRateInHz}---->audioDefaultChannel:${audioDefaultChannel}--->audioDefaultFormat:${audioDefaultFormat}")
         val bufferSizeInBytes = AudioTrack.getMinBufferSize(sampleRateInHz, audioDefaultChannel, audioDefaultFormat)
-        LogUtil.i("bufferSizeInBytes:${bufferSizeInBytes}")
         audioTrack = AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz, audioDefaultChannel, audioDefaultFormat, bufferSizeInBytes, AudioTrack.MODE_STREAM)
     }
 
@@ -71,8 +82,8 @@ class NativePlayer {
         playPath ?: throw NullPointerException("playPath is null")
         audioDecoder?.prepare(playPath!!)
         initAudioTrack()
-        LogUtil.i("audioDecoder--->prepare")
         startPlayerThread()
+        listener?.onReady()
     }
 
     private fun startPlayerThread() {
@@ -89,6 +100,16 @@ class NativePlayer {
             isPlaying = true
             isStop = false
         }
+    }
+
+
+    fun pause() {
+        isPlaying = false
+    }
+
+
+    fun resume() {
+        isPlaying = true
     }
 
     fun stop() {
@@ -118,10 +139,8 @@ class NativePlayer {
             var duration:Long? = null
             try {
                 while (!isStop) {
-                    LogUtil.i(TAG, "PlayThread--->need_data")
                     duration = System.currentTimeMillis()
                     val sampleCount = audioDecoder?.readSamples(samples)
-                    LogUtil.i(TAG, "PlayThread---->sampleCount:${sampleCount}")
                     if (sampleCount == -2) {
                         try {
                             Thread.sleep(10)
@@ -136,7 +155,6 @@ class NativePlayer {
                         isPlaying = false
                         break
                     }
-                    LogUtil.i(TAG, "duration:${System.currentTimeMillis() - duration}----->decoderBufferSize:${decoderBufferSize}")
                     while (true) {
                         synchronized(NativePlayer::class.java) {
                             isPlayTemp = isPlaying
@@ -145,19 +163,23 @@ class NativePlayer {
                             break
                         else
                             Thread.yield()
-
                     }
-                    if (audioTrack?.state != AudioTrack.STATE_UNINITIALIZED) {
+                    if (audioTrack?.state != AudioTrack.STATE_UNINITIALIZED && !isSeekData) {
                         audioTrack?.write(samples, 0, sampleCount!!)
                     }
+                    isSeekData = false
                 }
             }catch (e:Exception){
                 e.printStackTrace()
             }
             audioDecoder?.destory()
+            playerThread = null
         }
-
     }
 
+
+    interface OnPlayListener{
+        fun onReady()
+    }
 
 }

@@ -20,7 +20,7 @@
         android:id="@+id/mp3CreateFile"
         android:layout_width="0dp"
         android:layout_height="50dp"
-        android:text="mp3CreateFile"
+        android:text="CreateFile"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -34,18 +34,26 @@
         app:layout_constraintTop_toBottomOf="@id/mp3CreateFile" />
 
     <Button
-        android:id="@+id/audio_track_end"
+        android:id="@+id/audio_track_pause"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="audioTrackEnd"
+        android:text="audioTrackPause"
         app:layout_constraintTop_toBottomOf="@id/audio_track_start" />
+
+
+    <Button
+        android:id="@+id/audio_track_stop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="audioTrackStop"
+        app:layout_constraintTop_toBottomOf="@id/audio_track_pause" />
 
 
     <androidx.appcompat.widget.AppCompatSeekBar
         android:id="@+id/audio_progress"
         android:layout_width="match_parent"
         android:layout_height="20dp"
-        app:layout_constraintTop_toBottomOf="@id/audio_track_end" />
+        app:layout_constraintTop_toBottomOf="@id/audio_track_stop" />
 
     <TextView
         android:id="@+id/progress"

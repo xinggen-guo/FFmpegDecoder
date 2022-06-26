@@ -4,8 +4,12 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.util.TimeUtils
+import android.view.DragEvent
+import android.view.View
+import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
+import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
 import com.audio.study.ffmpegdecoder.databinding.ActivityMainBinding
 import com.audio.study.ffmpegdecoder.utils.FileUtil
 import com.audio.study.ffmpegdecoder.utils.LogUtil
@@ -48,21 +52,52 @@ class MainActivity : AppCompatActivity() {
 //            stopAudioTest()
 //        }
 
+        nativePlayController = NativePlayController()
+        nativePlayController?.setPlayListener(object :NativePlayer.OnPlayListener{
+            override fun onReady() {
+                val duration = nativePlayController?.getDuration() ?: 0
+                binding.audioProgress.max = duration
+                binding.duration.text = formatSecond(duration.toLong())
+            }
+        })
+        nativePlayController?.setAudioDataSource(path)
+
         binding.audioTrackStart.setOnClickListener {
-            nativePlayController = NativePlayController()
-            nativePlayController?.setAudioDataSource(path)
             nativePlayController?.start()
-            val duration = nativePlayController?.getDuration() ?: 0
-            binding.audioProgress.max = duration
-            binding.duration.text = formatSecond(duration.toLong())
             startUpdateAudioProgress()
         }
 
-        binding.audioTrackEnd.setOnClickListener {
+        binding.audioTrackPause.setOnClickListener {
+            nativePlayController?.pause()
+        }
+
+        binding.audioTrackStop.setOnClickListener {
             stopUpdateAudioProgress()
             nativePlayController?.stop()
-            nativePlayController = null
         }
+
+
+        binding.audioProgress.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
+
+            var isSeek = false
+
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if(isSeek) {
+                    nativePlayController?.seek(progress)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                isSeek = true
+                nativePlayController?.pause()
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                nativePlayController?.resume()
+                isSeek = false
+            }
+
+        })
     }
 
     private fun stopUpdateAudioProgress() {

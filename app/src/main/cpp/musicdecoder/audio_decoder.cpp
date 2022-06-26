@@ -109,18 +109,20 @@ AudioPacket* AudioDecoder::decoderAudioPacket() {
     } else {
         audioPacket->audioSize = -1;
     }
+    LOGI("decoderAudioPacket------>audioStartPosition:%3f", audioPacket->startPosition);
     return audioPacket;
 }
 
+void AudioDecoder::seek(const long seek_time) {
+    time_seek = seek_time;
+    seekFrame();
+}
 
 int AudioDecoder::readSampleData(short *samples, int size) {
-    LOGI("readSampleData------start---->size:%d",size);
     int realSamplesSize = size;
     while (size > 0){
         if(audioBufferCursor < audioBufferSize){
-            LOGI("readSampleData------while---->audioBufferSize:%1d----audioBufferCursor:%2d",audioBufferSize,audioBufferCursor);
             int audioBufferDataSize = audioBufferSize - audioBufferCursor;
-            LOGI("readSampleData----->:%d",size);
             int copySize = MIN(size, audioBufferDataSize);
             memcpy(samples + (realSamplesSize - size), audioBuffer + audioBufferCursor, copySize * 2);
             size -= copySize;
@@ -130,10 +132,8 @@ int AudioDecoder::readSampleData(short *samples, int size) {
                 break;
             }
         }
-        LOGI("readSampleData------>while---size:%d",size);
     }
     int fillSize = realSamplesSize - size;
-    LOGI("readSampleData------>end---fillSize:%d",fillSize);
     if(fillSize == 0){
         return -1;
     }
@@ -141,16 +141,13 @@ int AudioDecoder::readSampleData(short *samples, int size) {
 }
 
 int AudioDecoder::readFrame() {
-    LOGI("decoderAudioPacket--0000000");
     int ret = 0;
     avPacket = av_packet_alloc();
     if (av_read_frame(avFormatContext, avPacket) >= 0) {
         if (avPacket->stream_index == audioIndex) {
             avcodec_send_packet(avCodecContext, avPacket);
-            LOGI("decoderAudioPacket--->avPacketSize:%d",avPacket->size);
             av_packet_unref(avPacket);
             int re = avcodec_receive_frame(avCodecContext, avFrame);
-            LOGI("decoderAudioPacket--111111->re:%1d",re);
             if (re != 0) {
                 ret = -1;
             } else {
@@ -173,15 +170,24 @@ int AudioDecoder::readFrame() {
                 if(audioStartPosition == 0) {
                     audioStartPosition = avFrame->pts * time_base;
                 }
-                LOGI("decoderAudioPacket--33333---->audioBufferSize:%1d---->audioDuration:%2f--->audioStartPosition:%3f", audioBufferSize, audioDuration, audioStartPosition);
             }
         }
     } else {
         ret = -1;
     }
-    LOGI("decoderAudioPacket--444444");
     av_packet_free(&avPacket);
     return ret;
+}
+
+void AudioDecoder::seekFrame() {
+    LOGI("seekFrame--start");
+    if(time_seek > 0){
+        int64_t seek_pos = time_seek / time_base;
+        if (av_seek_frame(avFormatContext, audioIndex, seek_pos, AVSEEK_FLAG_BACKWARD) < 0) {
+            LOGI("seekFrame-- failed!---time_position:%1f", (double) seek_pos/1000);
+        }
+    }
+    LOGI("seekFrame--end");
 }
 
 bool AudioDecoder::audioCodecIsSupported() {
@@ -214,5 +220,3 @@ void AudioDecoder::destroy() {
         avFormatContext = NULL;
     }
 }
-
-
