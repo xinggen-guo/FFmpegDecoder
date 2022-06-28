@@ -10,6 +10,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegDecoder">
         <activity
+            android:name=".AudioTrackerActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

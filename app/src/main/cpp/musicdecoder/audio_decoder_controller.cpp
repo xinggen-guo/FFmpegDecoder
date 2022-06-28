@@ -44,20 +44,29 @@ int AudioDecoderController::readSapmles(short *samples, int size) {
     int result = 0;
     if(!audioQueueData.empty() && !needSeek){
         AudioPacket *audioPacket = audioQueueData.front();
-        short *dataSamples = audioPacket->audioBuffer;
-        memcpy(samples, dataSamples, audioPacket->audioSize * 2);
-        progress = audioPacket->startPosition;
-        audioQueueData.pop();
-        result = audioPacket->audioSize;
+        if(audioPacket->audioSize == -1){
+            result = -1;
+        } else {
+            short *dataSamples = audioPacket->audioBuffer;
+            memcpy(samples, dataSamples, audioPacket->audioSize * 2);
+            progress = audioPacket->startPosition;
+            audioQueueData.pop();
+            result = audioPacket->audioSize;
+        }
         delete audioPacket;
     } else {
-        result = -2;
+        if(isRunning || needSeek){
+            result = -2;
+        } else{
+            result = -3;
+        }
     }
-    if(audioQueueData.size() < QUEUE_SIZE_MIN_THRESHOLD){
+    if(audioQueueData.size() < QUEUE_SIZE_MIN_THRESHOLD && isRunning){
         int getLockCode = pthread_mutex_lock(&mLock);
         if (result != -1) {
             pthread_cond_signal(&mCondition);
         }
+        LOGI("pthread_mutex_unlock----->222222");
         pthread_mutex_unlock (&mLock);
     }
     return result;
@@ -71,7 +80,7 @@ void AudioDecoderController::destroy() {
         audioDecoder = NULL;
     }
     delete (&audioQueueData);
-    destroyDecoderThread();
+    isRunning = false;
 }
 
 
@@ -86,7 +95,6 @@ void AudioDecoderController::initDecoderThread() {
 void* AudioDecoderController::startDecoderThread(void *ptr) {
     AudioDecoderController* decoderController =
             (AudioDecoderController *) ptr;
-    LOGI("startDecoderThread----->wait");
     int getLockCode = pthread_mutex_lock(&decoderController->mLock);
     while (decoderController->isRunning) {
         if (decoderController->needSeek) {
@@ -94,32 +102,46 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
                 int dataSize = decoderController->audioQueueData.size();
                 if (dataSize > 0) {
                     for (int i = 0; i < dataSize; i++) {
+                        AudioPacket *audioPacket = decoderController->audioQueueData.front();
                         decoderController->audioQueueData.pop();
+                        delete audioPacket;
                     }
                 }
                 decoderController->audioDecoder->seek(decoderController->seekTime);
                 decoderController->seekTime = 0;
             }
         }
-        decoderController->decodeSongPacket();
-        if(decoderController->needSeek) {
+        int result = decoderController->decodeSongPacket();
+        if (result == -1) {
+            break;
+        }
+        if (decoderController->needSeek) {
             decoderController->needSeek = false;
         }
         if (decoderController->audioQueueData.size() >= QUEUE_SIZE_MAX_THRESHOLD) {
             pthread_cond_wait(&decoderController->mCondition, &decoderController->mLock);
         }
     }
+    LOGI("startDecoderThread----->11111");
+    decoderController->isRunning = false;
     pthread_mutex_unlock(&decoderController->mLock);
+    decoderController->destroyDecoderThread();
+    pthread_exit(0);
 }
 
-void AudioDecoderController::decodeSongPacket() {
+int AudioDecoderController::decodeSongPacket() {
     LOGI("decodeSongPacket----->start");
     AudioPacket* audioPacket = audioDecoder->decoderAudioPacket();
-    audioQueueData.push(audioPacket);
-    LOGI("decodeSongPacket----->end");
+    if(audioPacket->audioSize == -1){
+        return audioPacket->audioSize;
+    } else {
+        audioQueueData.push(audioPacket);
+        return 1;
+    }
 }
 
 void AudioDecoderController::destroyDecoderThread() {
+    LOGI("destroyDecoderThread");
     isRunning = false;
     int getLockCode = pthread_mutex_lock(&mLock);
     pthread_cond_signal(&mCondition);

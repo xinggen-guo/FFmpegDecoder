@@ -33,7 +33,7 @@ private:
     /** 开启解码线程 **/
     virtual void initDecoderThread();
 
-    void decodeSongPacket();
+    int decodeSongPacket();
 
     /** 销毁解码线程 **/
     virtual void destroyDecoderThread();

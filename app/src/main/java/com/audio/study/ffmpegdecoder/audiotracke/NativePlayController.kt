@@ -44,5 +44,4 @@ class NativePlayController {
         nativePlayer.seek(progress.toLong())
     }
 
-
 }

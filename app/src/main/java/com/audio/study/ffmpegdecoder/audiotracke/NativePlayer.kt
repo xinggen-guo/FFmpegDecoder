@@ -131,6 +131,10 @@ class NativePlayer {
         return audioDecoder?.getProgress() ?: 0
     }
 
+    fun destroy() {
+        audioDecoder?.destory()
+    }
+
     inner class PlayThread : Runnable {
 
         override fun run() {
@@ -149,10 +153,14 @@ class NativePlayer {
                         }
                         LogUtil.i("WARN : no play data")
                         continue
-                    }
-                    if(sampleCount == -1){
+                    }else if(sampleCount == -1){
                         isStop = true
                         isPlaying = false
+                        break
+                    }else if(sampleCount == -3){
+                        isPlaying = false
+                        isStop = true
+                        listener?.onPlayComplete()
                         break
                     }
                     while (true) {
@@ -164,7 +172,7 @@ class NativePlayer {
                         else
                             Thread.yield()
                     }
-                    if (audioTrack?.state != AudioTrack.STATE_UNINITIALIZED && !isSeekData) {
+                    if (audioTrack?.state != AudioTrack.STATE_UNINITIALIZED && !isSeekData && !isStop) {
                         audioTrack?.write(samples, 0, sampleCount!!)
                     }
                     isSeekData = false
@@ -180,6 +188,8 @@ class NativePlayer {
 
     interface OnPlayListener{
         fun onReady()
+
+        fun onPlayComplete()
     }
 
 }

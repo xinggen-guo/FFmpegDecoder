@@ -7,8 +7,6 @@
 
 const char *TAG = "FFmpegDecorder";
 
-#define LOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-
 extern "C" {
     #include <libavformat/avformat.h>
     #include <libswresample/swresample.h>
@@ -266,7 +264,7 @@ bool stop = false;
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobject thiz, jstring audioInputPath) {
+Java_com_audio_study_ffmpegdecoder_AudioTrackerActivity_playAudioTest(JNIEnv *env, jobject thiz, jstring audioInputPath) {
 
     if (audioInputPath == NULL) return;
     int result = -1;
@@ -421,8 +419,6 @@ Java_com_audio_study_ffmpegdecoder_MainActivity_playAudioTest(JNIEnv *env, jobje
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_audio_study_ffmpegdecoder_MainActivity_stopAudioTest(JNIEnv *env, jobject thiz) {
+Java_com_audio_study_ffmpegdecoder_AudioTrackerActivity_stopAudioTest(JNIEnv *env, jobject thiz) {
     stop = true;
 }
-
-

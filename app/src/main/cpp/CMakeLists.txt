@@ -10,14 +10,17 @@ project("ffmpegdecoder")
 set(COMMON "${CMAKE_SOURCE_DIR}/common")
 set(MUSIC_DECODER "${CMAKE_SOURCE_DIR}/musicdecoder")
 set(FFMPEG_DIR "${CMAKE_SOURCE_DIR}/ffmpeg")
+set(OPEN_SL_DIR "${CMAKE_SOURCE_DIR}/libopensl")
 
 file(GLOB_RECURSE native_srcs "${CMAKE_SOURCE_DIR}/*.cpp")
 file(GLOB MUSIC_DECODER_CPP "${MUSIC_DECODER}/*.cpp")
 file(GLOB COMMON_CPP "${COMMON}/*.cpp")
+file(GLOB OPEN_SL_DIR_CPP "${OPEN_SL_DIR}/*.cpp")
 
 include_directories(${COMMON})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/ffmpeg/include)
 include_directories(${MUSIC_DECODER})
+include_directories(${OPEN_SL_DIR})
 
 add_library( # Sets the name of the library.
         ffmpegdecoder
@@ -27,6 +30,7 @@ add_library( # Sets the name of the library.
         ${COMMON_CPP}
         ${MUSIC_DECODER_CPP}
         ${native_srcs}
+        ${OPEN_SL_DIR_CPP}
         # Provides a relative path to your source file(s).
         )
 
