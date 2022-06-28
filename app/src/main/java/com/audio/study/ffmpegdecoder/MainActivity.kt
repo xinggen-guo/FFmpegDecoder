@@ -34,7 +34,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.audioTrackerPlay.setOnClickListener {
-            startActivity(Intent(this,AudioTrackerActivity::class.java))
+            startActivity(Intent(this, AudioTrackerActivity::class.java))
+        }
+
+        binding.audioOpenSLES.setOnClickListener {
+            startActivity(Intent(this, AudioOpenSLESActivity::class.java))
         }
     }
 

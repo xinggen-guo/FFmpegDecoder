@@ -119,9 +119,6 @@ class AudioTrackerActivity : AppCompatActivity() {
 
     companion object {
 
-        private const val TAG = "AudioTrackerActivity"
-
-        // Used to load the 'ffmpegdecoder' library on application startup.
         init {
             System.loadLibrary("ffmpegdecoder")
         }

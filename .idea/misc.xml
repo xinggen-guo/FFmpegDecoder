@@ -3,6 +3,7 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="app/src/main/res/layout/activity_audio_open_slesactivity.xml" value="0.3880208333333333" />
         <entry key="app/src/main/res/layout/activity_audio_tracke.xml" value="0.2640625" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.22972972972972974" />
       </map>

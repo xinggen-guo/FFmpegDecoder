@@ -10,9 +10,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegDecoder">
         <activity
-            android:name=".AudioTrackerActivity"
-            android:exported="false" />
-        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
@@ -21,6 +18,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".AudioOpenSLESActivity"
+            android:label="AudioOpenSLES"
+            android:exported="false" />
+        <activity
+            android:name=".AudioTrackerActivity"
+            android:label="AudioTracker"
+            android:exported="false" />
     </application>
 
 </manifest>
