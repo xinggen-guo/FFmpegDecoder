@@ -7,6 +7,7 @@
 
 #define PLAYING_STATE_STOPPED (0x00000001)
 #define PLAYING_STATE_PLAYING (0x00000002)
+#define PLAYING_STATE_PAUSE (0x00000003)
 
 class SoundService {
 private:
@@ -29,10 +30,6 @@ private:
 	SLObjectItf audioPlayerObject;
 	SLAndroidSimpleBufferQueueItf audioPlayerBufferQueue;
 	SLPlayItf audioPlayerPlay;
-
-	SLObjectItf slientAudioPlayerObject;
-	SLAndroidSimpleBufferQueueItf slientAudioPlayerBufferQueue;
-	SLPlayItf slientAudioPlayerPlay;
 
 	int packetBufferSize;
 	short* target;
@@ -139,58 +136,6 @@ private:
 		return (*engineEngine)->CreateAudioPlayer(engineEngine, &audioPlayerObject, &dataSource, &dataSink, ARRAY_LEN(interfaceIds), interfaceIds, requiredInterfaces);
 	};
 
-	SLresult CreateBufferQueueSlientAudioPlayer() {
-		// Android simple buffer queue locator for the data source
-		SLDataLocator_AndroidSimpleBufferQueue dataSourceLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, // locator type
-				1 // buffer count
-				};
-
-		//PCM data source format
-//		SLDataFormat_PCM dataSourceFormat = { SL_DATAFORMAT_PCM, // format type
-//				2, // channel count
-//				accompanySampleRate, // samples per second in millihertz
-//				16, // bits per sample
-//				16, // container size
-//				SL_SPEAKER_FRONT_CENTER, // channel mask
-//				SL_BYTEORDER_LITTLEENDIAN // endianness
-//				};
-
-		uint samplesPerSec = opensl_get_sample_rate(accompanySampleRate);
-		SLDataFormat_PCM dataSourceFormat = { SL_DATAFORMAT_PCM, // format type
-				2, // channel count
-				samplesPerSec, // samples per second in millihertz
-				SL_PCMSAMPLEFORMAT_FIXED_16, // bits per sample
-				SL_PCMSAMPLEFORMAT_FIXED_16, // container size
-				SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT, // channel mask
-				SL_BYTEORDER_LITTLEENDIAN // endianness
-				};
-
-		// Data source is a simple buffer queue with PCM format
-		SLDataSource dataSource = { &dataSourceLocator, // data locator
-				&dataSourceFormat // data format
-				};
-
-		// Output mix locator for data sink
-		SLDataLocator_OutputMix dataSinkLocator = { SL_DATALOCATOR_OUTPUTMIX, // locator type
-				outputMixObject // output mix
-				};
-
-		// Data sink is an output mix
-		SLDataSink dataSink = { &dataSinkLocator, // locator
-				0 // format
-				};
-
-		// Interfaces that are requested
-		SLInterfaceID interfaceIds[] = { SL_IID_BUFFERQUEUE };
-
-		// Required interfaces. If the required interfaces
-		// are not available the request will fail
-		SLboolean requiredInterfaces[] = { SL_BOOLEAN_TRUE // for SL_IID_BUFFERQUEUE
-				};
-
-		// Create audio player object
-		return (*engineEngine)->CreateAudioPlayer(engineEngine, &slientAudioPlayerObject, &dataSource, &dataSink, ARRAY_LEN(interfaceIds), interfaceIds, requiredInterfaces);
-	};
 
 	/**
 	 * Gets the audio player buffer queue interface.
@@ -198,10 +143,6 @@ private:
 	SLresult GetAudioPlayerBufferQueueInterface() {
 		// Get the buffer queue interface
 		return (*audioPlayerObject)->GetInterface(audioPlayerObject, SL_IID_BUFFERQUEUE, &audioPlayerBufferQueue);
-	};
-	SLresult GetSlientAudioPlayerBufferQueueInterface() {
-		// Get the buffer queue interface
-		return (*slientAudioPlayerObject)->GetInterface(slientAudioPlayerObject, SL_IID_BUFFERQUEUE, &slientAudioPlayerBufferQueue);
 	};
 
 	/**
@@ -226,10 +167,6 @@ private:
 		// Get the play interface
 		return (*audioPlayerObject)->GetInterface(audioPlayerObject, SL_IID_PLAY, &audioPlayerPlay);
 	};
-	SLresult GetSlientAudioPlayerPlayInterface() {
-		// Get the play interface
-		return (*slientAudioPlayerObject)->GetInterface(slientAudioPlayerObject, SL_IID_PLAY, &slientAudioPlayerPlay);
-	};
 
 	/**
 	 * Sets the audio player state playing.
@@ -237,10 +174,6 @@ private:
 	SLresult SetAudioPlayerStatePlaying() {
 		// Set audio player state to playing
 		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_PLAYING);
-	};
-	SLresult SetSlientAudioPlayerStatePlaying() {
-		// Set audio player state to playing
-		return (*slientAudioPlayerPlay)->SetPlayState(slientAudioPlayerPlay, SL_PLAYSTATE_PLAYING);
 	};
 
 	/**
@@ -250,18 +183,10 @@ private:
 		// Set audio player state to paused
 		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_PAUSED);
 	};
-	SLresult SetSlientAudioPlayerStatePaused() {
-		// Set audio player state to paused
-		return (*slientAudioPlayerPlay)->SetPlayState(slientAudioPlayerPlay, SL_PLAYSTATE_PAUSED);
-	};
 
 	SLresult SetAudioPlayerStateStoped() {
 		// Set audio player state to paused
 		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_STOPPED);
-	};
-	SLresult SetSlientAudioPlayerStateStoped() {
-		// Set audio player state to paused
-		return (*slientAudioPlayerPlay)->SetPlayState(slientAudioPlayerPlay, SL_PLAYSTATE_STOPPED);
 	};
 
 public:
@@ -276,6 +201,9 @@ public:
 	};
 	SLresult play();
 	SLresult stop();
+	SLresult pause();
+	SLresult resume();
+
 	void producePacket(bool isPlayInit);
 	bool isPlaying();
 	int getCurrentTimeMills();
@@ -285,5 +213,6 @@ public:
 	 */
 	void DestroyContext();
 	int getDurationTimeMills();
+
 };
 #endif	//_MEDIA_SOUND_SERVICE_

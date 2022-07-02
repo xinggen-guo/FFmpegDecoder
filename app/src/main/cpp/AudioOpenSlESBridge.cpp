@@ -28,6 +28,12 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_play(JNIEnv *en
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_pause(JNIEnv *env, jobject thiz) {
+    soundService->pause();
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_resume(JNIEnv *env, jobject thiz) {
+    soundService->resume();
 }
 extern "C"
 JNIEXPORT void JNICALL

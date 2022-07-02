@@ -23,6 +23,10 @@ class SoundTrackController {
     external fun pause()
 
     /**
+     * 恢复播放
+     */
+    external fun resume()
+    /**
      * 停止伴奏
      */
     external fun stop()
@@ -49,6 +53,7 @@ class SoundTrackController {
     fun setOnSoundTrackListener(onSoundTrackListener: OnSoundTrackListener?) {
         this.onSoundTrackListener = onSoundTrackListener
     }
+
 
     interface OnSoundTrackListener {
         fun onCompletion()

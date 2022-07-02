@@ -58,6 +58,11 @@ class AudioOpenSLESActivity : AppCompatActivity() {
             songTrackController?.pause()
         }
 
+        binding.openslEsResume.setOnClickListener {
+            songTrackController?.resume()
+            startUpdateAudioProgress()
+        }
+
         binding.openslEsDestroy.setOnClickListener {
             stopUpdateAudioProgress()
             songTrackController?.stop()

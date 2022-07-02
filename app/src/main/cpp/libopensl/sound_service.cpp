@@ -25,7 +25,7 @@ void SoundService::setOnCompletionCallback(JavaVM *g_jvm_param, jobject objParam
 void SoundService::producePacket(bool isPlayInit) {
 	LOGI("SoundService::producePacket() audio player call back method... ");
 	// Read data
-	short * audioBuffer = new short[packetBufferSize];
+	short *audioBuffer = new short[packetBufferSize];
 	int result = -1;
 	if (NULL != decoderController) {
 		result = decoderController->readSapmles(target, packetBufferSize);
@@ -48,11 +48,6 @@ SLresult SoundService::RegisterPlayerCallback() {
 	return (*audioPlayerBufferQueue)->RegisterCallback(audioPlayerBufferQueue, PlayerCallback, this); // player context
 }
 
-SLresult SoundService::RegisterSlientPlayerCallback() {
-	// Register the player callback
-	return (*slientAudioPlayerBufferQueue)->RegisterCallback(slientAudioPlayerBufferQueue, PlayerCallback, this); // player context
-}
-
 SLresult SoundService::stop() {
 	LOGI("enter SoundService::stop()");
 
@@ -62,12 +57,6 @@ SLresult SoundService::stop() {
 	SLresult result = SetAudioPlayerStateStoped();
 	if (SL_RESULT_SUCCESS != result) {
 		LOGI("Set the audio player state paused return false");
-		return result;
-	}
-	LOGI("Set the slient audio player state paused");
-	result = SetSlientAudioPlayerStateStoped();
-	if (SL_RESULT_SUCCESS != result) {
-		LOGI("Set the slient audio player state paused return false");
 		return result;
 	}
 	DestroyContext();
@@ -83,11 +72,6 @@ SLresult SoundService::play() {
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
-	LOGI("Set the slient audio player state playing");
-	result = SetSlientAudioPlayerStatePlaying();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
 	LOGI(" Enqueue the first buffer to start");
 
 	playingState = PLAYING_STATE_PLAYING;
@@ -95,6 +79,30 @@ SLresult SoundService::play() {
 	producePacket(true);
 
 	LOGI("out SoundService::play()...");
+	return result;
+}
+
+SLresult SoundService::pause() {
+	LOGI("enter SoundService::pause()...");
+	SLresult result = SetAudioPlayerStatePaused();
+	if (SL_RESULT_SUCCESS != result) {
+		return result;
+	}
+	playingState = PLAYING_STATE_PAUSE;
+	return result;
+}
+
+
+SLresult SoundService::resume() {
+	LOGI("enter SoundService::resume()...");
+
+	// Set the audio player state playing
+	LOGI("Set the audio resume state playing");
+	SLresult result = SetAudioPlayerStatePlaying();
+	if (SL_RESULT_SUCCESS != result) {
+		return result;
+	}
+	playingState = PLAYING_STATE_PLAYING;
 	return result;
 }
 
@@ -147,18 +155,10 @@ SLresult SoundService::initSoundTrack() {
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
-	result = CreateBufferQueueSlientAudioPlayer();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
 
 	LOGI("Realize audio player object");
 	// Realize audio player object
 	result = RealizeObject(audioPlayerObject);
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
-	result = RealizeObject(slientAudioPlayerObject);
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
@@ -169,10 +169,6 @@ SLresult SoundService::initSoundTrack() {
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
-	result = GetSlientAudioPlayerBufferQueueInterface();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
 
 	LOGI("Registers the player callback");
 	// Registers the player callback
@@ -180,18 +176,9 @@ SLresult SoundService::initSoundTrack() {
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
-	result = RegisterSlientPlayerCallback();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
-
 	LOGI("Get audio player play interface");
 	// Get audio player play interface
 	result = GetAudioPlayerPlayInterface();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
-	result = GetSlientAudioPlayerPlayInterface();
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
@@ -212,7 +199,6 @@ void SoundService::DestroyContext() {
 	LOGI("enter SoundService::DestroyContext");
 	// Destroy audio player object
 	DestroyObject(audioPlayerObject);
-	DestroyObject(slientAudioPlayerObject);
 	LOGI("after destroy audioPlayerObject");
 	// Free the player buffer
 	FreePlayerBuffer();
@@ -226,11 +212,10 @@ void SoundService::DestroyContext() {
 		delete decoderController;
 		decoderController = NULL;
 	}
-//	isRunning = false;
-//	pthread_mutex_unlock(&mLock);
 	LOGI("leave SoundService::DestroyContext");
 }
 
 int SoundService::getDurationTimeMills() {
 	return duration;
 }
+
