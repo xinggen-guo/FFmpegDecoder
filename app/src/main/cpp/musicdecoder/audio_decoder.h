@@ -21,7 +21,6 @@ extern "C" {
 
 #define LOG_TAG "AudioDecoderLog"
 
-typedef unsigned char byte;
 typedef struct AudioPacket{
     short *audioBuffer;
     int audioSize;

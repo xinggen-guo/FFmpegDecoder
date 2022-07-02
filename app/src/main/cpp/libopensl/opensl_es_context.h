@@ -2,6 +2,7 @@
 #define _MEDIA_OPENSL_ES_CONTEXT_H_
 
 #include "opensl_es_util.h"
+#include "../common/CommonTools.h"
 
 class OpenSLESContext {
 private:
