@@ -17,28 +17,48 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_setAudioDataSou
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getAudioSampleRate(JNIEnv *env, jobject thiz) {
-    return soundService->getAccompanySampleRate();
+    if(NULL != soundService) {
+        return soundService->getAccompanySampleRate();
+    } else {
+        return -1;
+    }
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_play(JNIEnv *env, jobject thiz) {
-    soundService->initSoundTrack();
-    soundService->play();
+    if(NULL != soundService) {
+        soundService->initSoundTrack();
+        soundService->play();
+    }
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_pause(JNIEnv *env, jobject thiz) {
-    soundService->pause();
+    if(NULL != soundService) {
+        soundService->pause();
+    }
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_resume(JNIEnv *env, jobject thiz) {
-    soundService->resume();
+    if(soundService != NULL) {
+        soundService->resume();
+    }
 }
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_stop(JNIEnv *env, jobject thiz) {
-    soundService->stop();
+    if(NULL != soundService) {
+        soundService->stop();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_seek(JNIEnv *env, jobject thiz, jint progress) {
+    if(NULL != soundService){
+        soundService->seek(progress);
+    }
 }
 
 extern "C"

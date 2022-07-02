@@ -204,6 +204,8 @@ public:
 	SLresult pause();
 	SLresult resume();
 
+	void seek(const long seek_time);
+
 	void producePacket(bool isPlayInit);
 	bool isPlaying();
 	int getCurrentTimeMills();

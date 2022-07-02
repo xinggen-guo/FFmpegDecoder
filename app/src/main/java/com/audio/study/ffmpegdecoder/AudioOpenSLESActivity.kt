@@ -3,6 +3,7 @@ package com.audio.study.ffmpegdecoder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
+import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioOpenSlesactivityBinding
 import com.audio.study.ffmpegdecoder.opensles.SoundTrackController
 import com.audio.study.ffmpegdecoder.utils.formatSecond
@@ -68,6 +69,27 @@ class AudioOpenSLESActivity : AppCompatActivity() {
             songTrackController?.stop()
         }
 
+        binding.audioProgress.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
+
+            var isSeek = false
+
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if(isSeek) {
+                    songTrackController?.seek(progress)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                isSeek = true
+                songTrackController?.pause()
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                songTrackController?.resume()
+                isSeek = false
+            }
+
+        })
     }
 
     private fun stopUpdateAudioProgress() {

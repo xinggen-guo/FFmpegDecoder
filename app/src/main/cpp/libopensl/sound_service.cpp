@@ -106,6 +106,10 @@ SLresult SoundService::resume() {
 	return result;
 }
 
+void SoundService::seek(const long seek_time) {
+	decoderController->seek(seek_time);
+}
+
 bool SoundService::initSongDecoder(const char* accompanyPath) {
 	LOGI("enter SoundService::initSongDecoder");
 	decoderController = new AudioDecoderController();

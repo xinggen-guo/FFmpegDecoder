@@ -32,6 +32,11 @@ class SoundTrackController {
     external fun stop()
 
     /**
+     * seek
+     */
+    external fun seek(progress: Int)
+
+    /**
      * 获得播放伴奏的当前时间
      */
     external fun getProgress(): Int
@@ -39,7 +44,7 @@ class SoundTrackController {
     /**
      * 获取文件时长
      */
-    external fun getDuration():Int
+    external fun getDuration(): Int
 
     fun onCompletion() {
         onSoundTrackListener?.onCompletion()
@@ -53,7 +58,6 @@ class SoundTrackController {
     fun setOnSoundTrackListener(onSoundTrackListener: OnSoundTrackListener?) {
         this.onSoundTrackListener = onSoundTrackListener
     }
-
 
     interface OnSoundTrackListener {
         fun onCompletion()
