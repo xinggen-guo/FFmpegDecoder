@@ -33,7 +33,6 @@ class AudioOpenSLESActivity : AppCompatActivity() {
 
         binding.openslEsPrepare.setOnClickListener {
             songTrackController = SoundTrackController()
-            songTrackController?.setAudioDataSource(path)
             songTrackController?.setOnSoundTrackListener(object : SoundTrackController.OnSoundTrackListener {
                 override fun onCompletion() {
                     stopUpdateAudioProgress()
@@ -41,12 +40,14 @@ class AudioOpenSLESActivity : AppCompatActivity() {
                 }
 
                 override fun onReady() {
-
+                    val duration = songTrackController?.getDuration() ?: 0
+                    binding.audioProgress.max = duration
+                    binding.duration.text = formatSecond(duration.toLong())
                 }
             })
-            val duration = songTrackController?.getDuration() ?: 0
-            binding.audioProgress.max = duration
-            binding.duration.text = formatSecond(duration.toLong())
+            songTrackController?.apply {
+               this.setAudioDataSource(path,this)
+            }
         }
 
         binding.openslEsStart.setOnClickListener {

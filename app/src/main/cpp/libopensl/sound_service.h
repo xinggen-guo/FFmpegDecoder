@@ -216,5 +216,9 @@ public:
 	void DestroyContext();
 	int getDurationTimeMills();
 
+	void callReady();
+
+	void callComplete();
+
 };
 #endif	//_MEDIA_SOUND_SERVICE_

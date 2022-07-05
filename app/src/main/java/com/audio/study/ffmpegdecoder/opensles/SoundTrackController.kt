@@ -1,11 +1,11 @@
 package com.audio.study.ffmpegdecoder.opensles
 
-class SoundTrackController {
+class SoundTrackController : NativeOnSoundTrackListener {
 
     /**
      * 设置播放文件地址，有可能是伴唱原唱都要进行设置
      */
-    external fun setAudioDataSource(audioPath: String): Boolean
+    external fun setAudioDataSource(audioPath: String, nativeOnSoundTrackListener: NativeOnSoundTrackListener): Boolean
 
     /**
      * 获得伴奏的采样频率
@@ -46,11 +46,11 @@ class SoundTrackController {
      */
     external fun getDuration(): Int
 
-    fun onCompletion() {
+    override fun onCompletion() {
         onSoundTrackListener?.onCompletion()
     }
 
-    fun onReady(){
+    override fun onReady(){
         onSoundTrackListener?.onReady()
     }
 
@@ -63,5 +63,9 @@ class SoundTrackController {
         fun onCompletion()
         fun onReady()
     }
+}
 
+interface NativeOnSoundTrackListener {
+    fun onCompletion()
+    fun onReady()
 }

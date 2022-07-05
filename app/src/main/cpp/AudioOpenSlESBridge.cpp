@@ -9,9 +9,12 @@ SoundService* soundService = NULL;
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_setAudioDataSource(JNIEnv *env, jobject thiz, jstring audio_path) {
+Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_setAudioDataSource(JNIEnv *env, jobject thiz, jstring audio_path, jobject callBack) {
     const char *audioPath = env->GetStringUTFChars(audio_path, NULL);
     soundService = SoundService::GetInstance();
+    JavaVM *g_jvm;
+    env->GetJavaVM(&g_jvm);
+    soundService->setOnCompletionCallback(g_jvm, callBack);
     return soundService->initSongDecoder(audioPath);
 }
 extern "C"
@@ -64,10 +67,14 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_seek(JNIEnv *en
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getProgress(JNIEnv *env, jobject thiz) {
-    return soundService->getCurrentTimeMills();
+    if(NULL != soundService) {
+        return soundService->getCurrentTimeMills();
+    }
 }
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getDuration(JNIEnv *env, jobject thiz) {
-    return soundService->getDurationTimeMills();
+    if(NULL != soundService) {
+        return soundService->getDurationTimeMills();
+    }
 }

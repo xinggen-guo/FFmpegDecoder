@@ -38,9 +38,8 @@ void SoundService::producePacket(bool isPlayInit) {
 	} else if (result == -2) {  //需要等待解码数据
 
 	} else if (result == -3) {   //播放完成，需要调用完成回调
-
+//		callComplete();  暂时先注掉，有问题
 	}
-
 }
 
 SLresult SoundService::RegisterPlayerCallback() {
@@ -121,7 +120,42 @@ bool SoundService::initSongDecoder(const char* accompanyPath) {
 	//我们这里预设置bufferNums个packet的buffer
 	duration = metaData[2];
 	decoderController->prepare(accompanyPath);
+//	callReady();  暂时先注掉，有问题
 	return true;
+}
+
+void SoundService::callReady(){
+	JNIEnv *env;
+	//Attach主线程
+	if (g_jvm->AttachCurrentThread(&env, NULL) != JNI_OK) {
+		LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
+	}
+	jclass jcls = env->GetObjectClass(obj);
+	jmethodID onCompletionCallBack = env->GetMethodID(jcls, "onReady", "()V");
+	LOGI("before env->CallVoidMethod");
+	env->CallVoidMethod(obj, onCompletionCallBack);
+	LOGI("after env->CallVoidMethod");
+	//Detach主线程
+	if (g_jvm->DetachCurrentThread() != JNI_OK) {
+		LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
+	}
+}
+
+void SoundService::callComplete() {
+	JNIEnv *env;
+	//Attach主线程
+	if (g_jvm->AttachCurrentThread(&env, NULL) != JNI_OK) {
+		LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
+	}
+	jclass jcls = env->GetObjectClass(obj);
+	jmethodID onCompletionCallBack = env->GetMethodID(jcls, "onCompletion", "()V");
+	LOGI("before env->CallVoidMethod");
+	env->CallVoidMethod(obj, onCompletionCallBack);
+	LOGI("after env->CallVoidMethod");
+	//Detach主线程
+	if (g_jvm->DetachCurrentThread() != JNI_OK) {
+		LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
+	}
 }
 
 SLresult SoundService::initSoundTrack() {
