@@ -7,15 +7,12 @@ import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioTrackeBinding
-import com.audio.study.ffmpegdecoder.databinding.ActivityMainBinding
-import com.audio.study.ffmpegdecoder.utils.FileUtil
-import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
 
 class AudioTrackerActivity : AppCompatActivity() {
 
-    private lateinit var binding:ActivityAudioTrackeBinding
+    private lateinit var binding: ActivityAudioTrackeBinding
 
     private var nativePlayController: NativePlayController? = null
 
@@ -42,7 +39,7 @@ class AudioTrackerActivity : AppCompatActivity() {
 
         binding.audioTrackPrepare.setOnClickListener {
             nativePlayController = NativePlayController()
-            nativePlayController?.setPlayListener(object : NativePlayer.OnPlayListener{
+            nativePlayController?.setPlayListener(object : NativePlayer.OnPlayListener {
                 override fun onReady() {
                     val duration = nativePlayController?.getDuration() ?: 0
                     binding.audioProgress.max = duration
@@ -72,12 +69,12 @@ class AudioTrackerActivity : AppCompatActivity() {
             nativePlayController = null
         }
 
-        binding.audioProgress.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
+        binding.audioProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
 
             var isSeek = false
 
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if(isSeek) {
+                if (isSeek) {
                     nativePlayController?.seek(progress)
                 }
             }

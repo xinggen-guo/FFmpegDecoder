@@ -6,21 +6,22 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-
     <Button
         android:id="@+id/mp3CreateFile"
         android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="CreateFile"
+        android:layout_height="wrap_content"
+        android:text="Create File"
         app:layout_constraintEnd_toEndOf="parent"
+        android:textAllCaps="false"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/audioTrackerPlay"
         android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="AudioTrackerPlay"
+        android:layout_height="wrap_content"
+        android:text="Audio Tracker Play"
+        android:textAllCaps="false"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/mp3CreateFile" />
@@ -28,10 +29,21 @@
     <Button
         android:id="@+id/audioOpenSLES"
         android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:text="AudioOpenSLESPlay"
+        android:layout_height="wrap_content"
+        android:text="Audio OpenSLES Play"
         app:layout_constraintEnd_toEndOf="parent"
+        android:textAllCaps="false"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/audioTrackerPlay" />
+
+    <Button
+        android:id="@+id/audioOpenGL"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="OpenGL Demo"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/audioOpenSLES" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

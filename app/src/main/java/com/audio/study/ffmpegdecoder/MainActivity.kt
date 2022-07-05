@@ -40,6 +40,9 @@ class MainActivity : AppCompatActivity() {
         binding.audioOpenSLES.setOnClickListener {
             startActivity(Intent(this, AudioOpenSLESActivity::class.java))
         }
+        binding.audioOpenGL.setOnClickListener {
+            startActivity(Intent(this, OpenGLActivity::class.java))
+        }
     }
 
     /**
