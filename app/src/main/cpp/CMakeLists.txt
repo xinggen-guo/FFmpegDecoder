@@ -11,16 +11,19 @@ set(COMMON "${CMAKE_SOURCE_DIR}/common")
 set(FFMPEG_DIR "${CMAKE_SOURCE_DIR}/ffmpeg")
 set(MUSIC_DECODER "${CMAKE_SOURCE_DIR}/musicdecoder")
 set(OPEN_SL_DIR "${CMAKE_SOURCE_DIR}/libopensl")
+set(OPEN_GL_DIR "${CMAKE_SOURCE_DIR}/render")
 
 file(GLOB_RECURSE native_srcs "${CMAKE_SOURCE_DIR}/*.cpp")
 file(GLOB COMMON_CPP "${COMMON}/*.cpp")
 file(GLOB MUSIC_DECODER_CPP "${MUSIC_DECODER}/*.cpp")
 file(GLOB OPEN_SL_DIR_CPP "${OPEN_SL_DIR}/*.cpp")
+file(GLOB OPEN_GL_DIR_CPP "${OPEN_GL_DIR}/*.cpp")
 
 include_directories(${CMAKE_SOURCE_DIR}/ffmpeg/include)
 include_directories(${COMMON})
 include_directories(${MUSIC_DECODER})
 include_directories(${OPEN_SL_DIR})
+include_directories(${OPEN_GL_DIR})
 
 add_library( # Sets the name of the library.
         ffmpegdecoder
@@ -31,6 +34,7 @@ add_library( # Sets the name of the library.
         ${MUSIC_DECODER_CPP}
         ${native_srcs}
         ${OPEN_SL_DIR_CPP}
+        ${OPEN_GL_DIR_CPP}
         # Provides a relative path to your source file(s).
         )
 
@@ -57,4 +61,6 @@ target_link_libraries( # Specifies the target library.
         # included in the NDK.
         ${log-lib}
         OpenSLES
+        EGL
+        GLESv3
         z)

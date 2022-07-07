@@ -3,7 +3,7 @@
     package="com.audio.study.ffmpegdecoder">
 
     <uses-feature
-        android:glEsVersion="0x00020000"
+        android:glEsVersion="0x00030002"
         android:required="true" />
 
     <application
@@ -18,21 +18,23 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <activity
             android:name=".AudioOpenSLESActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:label="AudioOpenSLES" />
         <activity
             android:name=".AudioTrackerActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:label="AudioTracker" />
         <activity
             android:name=".OpenGLActivity"
             android:label="OpenGLDemo"
+            android:screenOrientation="portrait"
             android:exported="false" />
     </application>
 

@@ -105,7 +105,7 @@ char *av_timecode_make_smpte_tc_string(char *buf, uint32_t tcsmpte, int prevent_
 char *av_timecode_make_mpeg_tc_string(char *buf, uint32_t tc25bit);
 
 /**
- * Init a timecode struct with the passed parameters.
+ * init a timecode struct with the passed parameters.
  *
  * @param log_ctx     a pointer to an arbitrary struct of which the first field
  *                    is a pointer to an AVClass struct (used for av_log)

@@ -7,6 +7,7 @@
 
 #include <jni.h>
 #include <android/log.h>
+#include <sys/time.h>
 
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
@@ -15,6 +16,24 @@
 #define INT16_MIN       -32768
 #define LOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...)  __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+#define GO_CHECK_GL_ERROR(...)   LOGCATE("CHECK_GL_ERROR %s glGetError = %d, line = %d, ",  __FUNCTION__, glGetError(), __LINE__)
+
+static long long GetSysCurrentTime()
+{
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    long long curTime = ((long long)(time.tv_sec))*1000+time.tv_usec/1000;
+    return curTime;
+}
+
+#define FUN_BEGIN_TIME(FUN) {\
+    LOGI("%s:%s func start", __FILE__, FUN); \
+    long long t0 = GetSysCurrentTime();
+
+#define FUN_END_TIME(FUN) \
+    long long t1 = GetSysCurrentTime(); \
+    LOGI("%s:%s func cost time %ldms", __FILE__, FUN, (long)(t1-t0));}
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof(a[0]))
 
@@ -26,6 +45,7 @@ inline void converttobytearray(SInt16 source, byte* bytes2) {
     bytes2[0] = (byte) (source & 0xff);
     bytes2[1] = (byte) ((source >> 8) & 0xff);
 }
+
 
 
 //将一个short数组转换为一个byte数组---清唱时由于不需要和伴奏合成，所以直接转换;还有一个是当解码完成之后，需要将short变为byte数组，写入文件

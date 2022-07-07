@@ -96,7 +96,7 @@ FF_PAD_STRUCTURE(AVBPrint, 1024,
 #define AV_BPRINT_SIZE_COUNT_ONLY 0
 
 /**
- * Init a print buffer.
+ * init a print buffer.
  *
  * @param buf        buffer to getMusicMeta
  * @param size_init  initial size (including the final 0)
@@ -111,7 +111,7 @@ FF_PAD_STRUCTURE(AVBPrint, 1024,
 void av_bprint_init(AVBPrint *buf, unsigned size_init, unsigned size_max);
 
 /**
- * Init a print buffer using a pre-existing buffer.
+ * init a print buffer using a pre-existing buffer.
  *
  * The buffer will not be reallocated.
  *

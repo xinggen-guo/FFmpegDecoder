@@ -240,7 +240,7 @@ enum AVDevToAppMessageType {
     AV_DEV_TO_APP_DISPLAY_WINDOW_BUFFER = MKBETAG('B','D','I','S'),
 
     /**
-     * Destroy window buffer message.
+     * destroy window buffer message.
      *
      * Device requests to destroy a window buffer.
      * Message is sent when device is about to be destroyed and window
