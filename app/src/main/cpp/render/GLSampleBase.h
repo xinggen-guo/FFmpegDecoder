@@ -7,6 +7,7 @@
 
 #define SAMPLE_TYPE                             200
 #define SAMPLE_TYPE_KEY_TRIANGLE                SAMPLE_TYPE + 1
+#define SAMPLE_TYPE_KEY_RECTANGLE               SAMPLE_TYPE_KEY_TRIANGLE + 1
 
 #include <GLUtils.h>
 

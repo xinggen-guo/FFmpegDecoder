@@ -30,4 +30,8 @@ class MyGLRenderer : GLSurfaceView.Renderer {
     fun onDestroy() {
        nativeRender.onDestroy()
     }
+
+    fun setRenderType(sampleType: Int) {
+        nativeRender.setRenderType(sampleType)
+    }
 }

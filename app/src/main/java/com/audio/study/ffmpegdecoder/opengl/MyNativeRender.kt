@@ -22,6 +22,10 @@ class MyNativeRender {
         nativeDestroy()
     }
 
+    fun setRenderType(sampleType: Int) {
+        nativeSetRenderType(sampleType)
+    }
+
     private external fun nativeInit()
 
     private external fun nativeSurfaceCreate()
@@ -31,6 +35,8 @@ class MyNativeRender {
     private external fun nativeDrawFrame()
 
     private external fun nativeDestroy()
+
+    private external fun nativeSetRenderType(sampleType: Int)
 
     companion object {
         init {

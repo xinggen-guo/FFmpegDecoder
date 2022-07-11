@@ -5,6 +5,7 @@
 #ifndef FFMPEGDECODER_GLTRIANGLESAMPLE_H
 #define FFMPEGDECODER_GLTRIANGLESAMPLE_H
 
+#define LOG_TAG = "GLTriangleSample"
 
 #include "GLSampleBase.h"
 

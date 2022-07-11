@@ -44,3 +44,10 @@ Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeDestroy(JNIEnv *e
         myGlRenderContext->destroy();
     }
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeSetRenderType(JNIEnv *env, jobject thiz, jint sample_type) {
+    if(NULL != myGlRenderContext){
+        myGlRenderContext->setRenderType(sample_type);
+    }
+}

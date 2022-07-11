@@ -28,9 +28,12 @@ public:
 
     void destroy();
 
+    void setRenderType(int renderType);
+
 private:
     int m_ScreenW;
     int m_ScreenH;
+    int currentType;
     GLSampleBase* currentSample;
 };
 

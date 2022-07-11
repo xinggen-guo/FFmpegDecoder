@@ -1,12 +1,11 @@
 //
-// Created by guoxinggen on 2022/7/6.
+// Created by guoxinggen on 2022/7/8.
 //
 
+#include "GLRectangleSample.h"
 
-#include "GLTriangleSample.h"
-
-
-void GLTriangleSample::init() {
+void GLRectangleSample::init() {
+    LOGI("init");
     if(m_ProgramObj != 0)
         return;
     char vShaderStr[] =
@@ -16,7 +15,7 @@ void GLTriangleSample::init() {
             "void main()                                        \n"
             "{                                                  \n"
             "   gl_Position = vec4(position,1.0f);              \n"
-            "   vertexColor = vec4(0.5f, 0.0f, 0.0f, 1.0f);     \n"
+            "   vertexColor = vec4(0.5f, 0.5f, 0.0f, 1.0f);     \n"
             "}                                                  \n";
 
     char fShaderStr[] =
@@ -31,16 +30,14 @@ void GLTriangleSample::init() {
     m_ProgramObj = GLUtils::CreateProgram(vShaderStr, fShaderStr, m_VertexShader, m_FragmentShader);
 }
 
-void GLTriangleSample::draw(int width, int height) {
 
-    m_SurfaceHeight = height;
-    m_SurfaceWidth = width;
-
+void GLRectangleSample::draw(int screenW, int screenH) {
     LOGI("TriangleSample::Draw");
     GLfloat vVertices[] = {
-            0.0f,  0.5f, 0.0f,
+            -0.5f,  0.5f, 0.0f,
             -0.5f, -0.5f, 0.0f,
-            0.5f, -0.5f, 0.0f,
+            0.5f, 0.5f, 0.0f,
+            0.5f, -0.5f, 0.0f
     };
 
     if(m_ProgramObj == 0)
@@ -59,12 +56,13 @@ void GLTriangleSample::draw(int width, int height) {
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
     glEnableVertexAttribArray (0);
 
-    glDrawArrays (GL_TRIANGLES, 0, 3);
+    glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
     glUseProgram (GL_NONE);
-
 }
 
-void GLTriangleSample::destroy() {
+
+void GLRectangleSample::destroy() {
+    LOGI("destroy");
     if (m_ProgramObj)
     {
         glDeleteProgram(m_ProgramObj);
