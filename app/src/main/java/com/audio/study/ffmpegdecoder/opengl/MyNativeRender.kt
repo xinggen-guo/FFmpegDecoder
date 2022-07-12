@@ -26,6 +26,10 @@ class MyNativeRender {
         nativeSetRenderType(sampleType)
     }
 
+    fun setImageData(format: Int, width: Int, height: Int, byteArray: ByteArray) {
+        nativeSetImageData(format,width,height,byteArray)
+    }
+
     private external fun nativeInit()
 
     private external fun nativeSurfaceCreate()
@@ -37,6 +41,8 @@ class MyNativeRender {
     private external fun nativeDestroy()
 
     private external fun nativeSetRenderType(sampleType: Int)
+
+    private external fun nativeSetImageData(format: Int, width: Int, height: Int, byteArray: ByteArray)
 
     companion object {
         init {

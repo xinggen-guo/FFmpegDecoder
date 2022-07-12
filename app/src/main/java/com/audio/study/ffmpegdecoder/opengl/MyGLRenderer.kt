@@ -34,4 +34,8 @@ class MyGLRenderer : GLSurfaceView.Renderer {
     fun setRenderType(sampleType: Int) {
         nativeRender.setRenderType(sampleType)
     }
+
+    fun setImageData(format: Int, width: Int, height: Int, byteArray: ByteArray) {
+        nativeRender.setImageData(format, width, height, byteArray)
+    }
 }

@@ -51,3 +51,15 @@ Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeSetRenderType(JNI
         myGlRenderContext->setRenderType(sample_type);
     }
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeSetImageData(JNIEnv *env, jobject thiz, jint format, jint width, jint height, jbyteArray imageData) {
+    if(NULL != myGlRenderContext){
+        int len = env->GetArrayLength (imageData);
+        uint8_t* buf = new uint8_t[len];
+        env->GetByteArrayRegion(imageData, 0, len, reinterpret_cast<jbyte*>(buf));
+        myGlRenderContext->setImageData(format, width, height, buf);
+        delete[] buf;
+        env->DeleteLocalRef(imageData);
+    }
+}

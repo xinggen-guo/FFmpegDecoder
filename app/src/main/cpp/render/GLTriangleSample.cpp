@@ -5,7 +5,6 @@
 
 #include "GLTriangleSample.h"
 
-
 void GLTriangleSample::init() {
     if(m_ProgramObj != 0)
         return;

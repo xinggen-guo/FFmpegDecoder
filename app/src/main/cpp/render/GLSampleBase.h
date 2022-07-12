@@ -8,8 +8,10 @@
 #define SAMPLE_TYPE                             200
 #define SAMPLE_TYPE_KEY_TRIANGLE                SAMPLE_TYPE + 1
 #define SAMPLE_TYPE_KEY_RECTANGLE               SAMPLE_TYPE_KEY_TRIANGLE + 1
+#define SAMPLE_TYPE_TEXTURE_MAP                 SAMPLE_TYPE_KEY_RECTANGLE + 1
 
 #include <GLUtils.h>
+#include <ImageDef.h>
 
 class GLSampleBase {
 
@@ -35,6 +37,9 @@ public:
     virtual void init() = 0;
     virtual void draw(int width, int height) = 0;
     virtual void destroy() = 0;
+
+    virtual void loadImageData(NativeImage *pImage)
+    {}
 
 protected:
     GLuint m_VertexShader;

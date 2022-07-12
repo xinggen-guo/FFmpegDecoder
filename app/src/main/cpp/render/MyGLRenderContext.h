@@ -30,6 +30,8 @@ public:
 
     void setRenderType(int renderType);
 
+    void setImageData(int format, int width, int height, uint8_t *imageData);
+
 private:
     int m_ScreenW;
     int m_ScreenH;

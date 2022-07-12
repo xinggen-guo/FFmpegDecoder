@@ -2,8 +2,10 @@
 // Created by guoxinggen on 2022/7/6.
 //
 
+#include <ImageDef.h>
 #include "MyGLRenderContext.h"
 #include "GLRectangleSample.h"
+#include "GLImageTextureMapSample.h"
 
 
 MyGLRenderContext::MyGLRenderContext() {
@@ -65,10 +67,25 @@ void MyGLRenderContext::setRenderType(int renderType) {
         case SAMPLE_TYPE_KEY_RECTANGLE:
             currentSample = new GLRectangleSample();
             break;
+        case SAMPLE_TYPE_TEXTURE_MAP:
+            currentSample = new GLImageTextureMapSample();
+            break;
         default:
             currentSample = new GLTriangleSample();
             break;
-
     }
     currentType = renderType;
+}
+
+void MyGLRenderContext::setImageData(int format, int width, int height, uint8_t *imageData) {
+    NativeImage nativeImage;
+    nativeImage.format = format;
+    nativeImage.width = width;
+    nativeImage.height = height;
+    nativeImage.ppPlane[0] = imageData;
+
+    if (currentSample)
+    {
+        currentSample->loadImageData(&nativeImage);
+    }
 }
