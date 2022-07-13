@@ -34,4 +34,8 @@ class MyGLSurfaceView(context: Context?) : GLSurfaceView(context) {
     fun setImageData(format: Int, width: Int, height: Int, byteArray: ByteArray) {
         renderer.setImageData(format, width, height, byteArray)
     }
+
+    fun setImageScale(imageScale: Float) {
+        renderer.setImageScale(imageScale)
+    }
 }

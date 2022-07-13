@@ -42,4 +42,13 @@
         android:textAllCaps="false" />
 
 
+    <androidx.appcompat.widget.AppCompatSeekBar
+        android:id="@+id/image_scale"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/gl_load_image" />
+
+
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -32,10 +32,13 @@ public:
 
     void setImageData(int format, int width, int height, uint8_t *imageData);
 
+    void setImageScale(float imageScale);
+
 private:
     int m_ScreenW;
     int m_ScreenH;
     int currentType;
+    bool needInitSample;
     GLSampleBase* currentSample;
 };
 

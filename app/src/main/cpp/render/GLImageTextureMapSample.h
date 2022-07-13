@@ -21,6 +21,8 @@ public:
 
     virtual void loadImageData(NativeImage *pImage);
 
+    virtual void setImageScale(float imageScale);
+
     virtual void draw(int screenW, int screenH);
 
     virtual void destroy();

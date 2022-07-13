@@ -38,4 +38,8 @@ class MyGLRenderer : GLSurfaceView.Renderer {
     fun setImageData(format: Int, width: Int, height: Int, byteArray: ByteArray) {
         nativeRender.setImageData(format, width, height, byteArray)
     }
+
+    fun setImageScale(imageScale: Float) {
+        nativeRender.setImageScale(imageScale)
+    }
 }

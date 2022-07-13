@@ -63,3 +63,10 @@ Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeSetImageData(JNIE
         env->DeleteLocalRef(imageData);
     }
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_opengl_MyNativeRender_nativeSetImageScale(JNIEnv *env, jobject thiz, jfloat imageScale) {
+    if (NULL != myGlRenderContext) {
+        myGlRenderContext->setImageScale(imageScale);
+    }
+}

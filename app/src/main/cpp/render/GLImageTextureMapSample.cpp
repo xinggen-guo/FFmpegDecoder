@@ -13,6 +13,9 @@ GLImageTextureMapSample::~GLImageTextureMapSample() {
 }
 
 void GLImageTextureMapSample::init() {
+
+    LOGI("GLImageTextureMapSample::Init create program fail");
+
     //create RGBA texture
 
     //生成一个纹理，将纹理 id 赋值给 m_TextureId
@@ -70,6 +73,12 @@ void GLImageTextureMapSample::loadImageData(NativeImage *pImage) {
     }
 }
 
+void GLImageTextureMapSample::setImageScale(float imageScale) {
+    if(&m_RenderImage){
+        m_RenderImage.scale = imageScale;
+    }
+}
+
 void GLImageTextureMapSample::draw(int screenW, int screenH) {
     LOGI("Draw()---->screenW:%1d----->screenH:%2d--->imageW:%3d--->imageHeight:%4d", screenW, screenH, m_RenderImage.width, m_RenderImage.height);
 
@@ -89,6 +98,8 @@ void GLImageTextureMapSample::draw(int screenW, int screenH) {
     } else {
         scale = 1.0f / rightX;
     }
+
+    scale = m_RenderImage.scale * scale;
 
     rightX = rightX * scale;
     leftX = leftX * scale;
@@ -139,6 +150,7 @@ void GLImageTextureMapSample::draw(int screenW, int screenH) {
 
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 
+    glUseProgram(GL_NONE);
 }
 
 void GLImageTextureMapSample::destroy() {

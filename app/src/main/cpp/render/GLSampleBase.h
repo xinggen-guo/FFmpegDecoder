@@ -40,6 +40,8 @@ public:
 
     virtual void loadImageData(NativeImage *pImage)
     {}
+    virtual void setImageScale(float imageScale)
+    {}
 
 protected:
     GLuint m_VertexShader;

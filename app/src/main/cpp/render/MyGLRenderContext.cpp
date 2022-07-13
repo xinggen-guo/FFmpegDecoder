@@ -12,6 +12,7 @@ MyGLRenderContext::MyGLRenderContext() {
     LOGI("MyGLRenderContext");
     currentType = SAMPLE_TYPE_KEY_TRIANGLE;
     currentSample = new GLTriangleSample();
+    needInitSample = true;
 }
 
 MyGLRenderContext::~MyGLRenderContext() {
@@ -36,10 +37,12 @@ void MyGLRenderContext::surfaceChange(int width, int height) {
 
 void MyGLRenderContext::drawFrame() {
     LOGI("drawFrame");
-
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
     if (NULL != currentSample) {
-        currentSample->init();
+        if(needInitSample) {
+            currentSample->init();
+            needInitSample = false;
+        }
         currentSample->draw(m_ScreenW, m_ScreenH);
     }
 }
@@ -75,6 +78,7 @@ void MyGLRenderContext::setRenderType(int renderType) {
             break;
     }
     currentType = renderType;
+    needInitSample = true;
 }
 
 void MyGLRenderContext::setImageData(int format, int width, int height, uint8_t *imageData) {
@@ -82,10 +86,17 @@ void MyGLRenderContext::setImageData(int format, int width, int height, uint8_t 
     nativeImage.format = format;
     nativeImage.width = width;
     nativeImage.height = height;
+    nativeImage.scale = 1.0f;
     nativeImage.ppPlane[0] = imageData;
 
     if (currentSample)
     {
         currentSample->loadImageData(&nativeImage);
+    }
+}
+
+void MyGLRenderContext::setImageScale(float imageScale) {
+    if(currentSample){
+        currentSample -> setImageScale(imageScale);
     }
 }

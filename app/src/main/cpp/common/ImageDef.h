@@ -22,6 +22,7 @@ typedef struct _tag_NativeImage
 	int width;
 	int height;
 	int format;
+	float scale;
 	uint8_t *ppPlane[1];
 
 	_tag_NativeImage()
@@ -29,6 +30,7 @@ typedef struct _tag_NativeImage
 		width = 0;
 		height = 0;
 		format = 0;
+		scale = 1.0f;
 		ppPlane[0] = NULL;
 	}
 } NativeImage;
