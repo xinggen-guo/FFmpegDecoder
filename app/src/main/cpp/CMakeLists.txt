@@ -19,7 +19,7 @@ file(GLOB MUSIC_DECODER_CPP "${MUSIC_DECODER}/*.cpp")
 file(GLOB OPEN_SL_DIR_CPP "${OPEN_SL_DIR}/*.cpp")
 file(GLOB OPEN_GL_DIR_CPP "${OPEN_GL_DIR}/*.cpp")
 
-include_directories(${CMAKE_SOURCE_DIR}/ffmpeg/include)
+include_directories(${CMAKE_SOURCE_DIR}/ffmpeg/include/${ANDROID_ABI})
 include_directories(${COMMON})
 include_directories(${MUSIC_DECODER})
 include_directories(${OPEN_SL_DIR})
@@ -49,14 +49,14 @@ find_library( # Sets the name of the path variable.
 
 target_link_libraries( # Specifies the target library.
         ffmpegdecoder
-        ${FFMPEG_DIR}/armeabi-v7a/libavformat.a
-        ${FFMPEG_DIR}/armeabi-v7a/libavcodec.a
-        ${FFMPEG_DIR}/armeabi-v7a/libavfilter.a
-        ${FFMPEG_DIR}/armeabi-v7a/libavdevice.a
-        ${FFMPEG_DIR}/armeabi-v7a/libavutil.a
-        ${FFMPEG_DIR}/armeabi-v7a/libpostproc.a
-        ${FFMPEG_DIR}/armeabi-v7a/libswresample.a
-        ${FFMPEG_DIR}/armeabi-v7a/libswscale.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libavformat.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libavcodec.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libavfilter.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libavdevice.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libavutil.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libpostproc.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libswresample.a
+        ${FFMPEG_DIR}/libs/${ANDROID_ABI}/libswscale.a
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib}
