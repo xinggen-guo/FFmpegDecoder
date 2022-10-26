@@ -7,6 +7,7 @@ import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioTrackeBinding
+import com.audio.study.ffmpegdecoder.utils.FileUtil
 import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
 
@@ -23,6 +24,11 @@ class AudioTrackerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
+        Thread {
+            FileUtil.copyFilesAssets(this, "input.mp3", path)
+        }.start()
 
         binding = ActivityAudioTrackeBinding.inflate(layoutInflater)
         setContentView(binding.root)
