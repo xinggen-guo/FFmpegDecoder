@@ -14,25 +14,40 @@ private:
 	SoundService(); //注意:构造方法私有
 	static SoundService* instance; //惟一实例
 
-    int playingState;
+    int playingState = PLAYING_STATE_STOPPED;
 	//播放完成回调的时候需要用到的参数
-	JavaVM *g_jvm;
-	jobject obj;
+	JavaVM *g_jvm = nullptr;
+	jobject obj = nullptr;
+
+    static const int QUEUE_BUFFER_COUNT = 4;   // 队列里同时挂 4 个 buffer
+
+    // 用来给 OpenSL 播放的字节缓冲（多帧环形）
+    uint8_t* mBuffer = nullptr;               // 整块 buffer
+    int      mBufferNums = QUEUE_BUFFER_COUNT;// 帧数
+    int      mCurrentFrame = 0;               // 当前使用第几帧
+    int      mPacketBufferSize = 0;           // 每次 readSamples 的“样本数”（short 个数）
+
+    // 解码出来的 PCM（short）临时缓冲（一个 packet）
+    short*   mTarget = nullptr;
+
+    // 解码器元数据
+    int duration = 0;
 
 	//解码Mp3的解码的controller
-	AudioDecoderController* decoderController;
+	AudioDecoderController* decoderController = nullptr;
 	//伴奏的采样频率
-	int accompanySampleRate;
-	int duration;
+	int accompanySampleRate = 0;
 
-	SLEngineItf engineEngine;
-	SLObjectItf outputMixObject;
-	SLObjectItf audioPlayerObject;
-	SLAndroidSimpleBufferQueueItf audioPlayerBufferQueue;
-	SLPlayItf audioPlayerPlay;
+	SLEngineItf engineEngine = nullptr;
+	SLObjectItf outputMixObject = nullptr;
+	SLObjectItf audioPlayerObject = nullptr;
+	SLAndroidSimpleBufferQueueItf audioPlayerBufferQueue = nullptr;
+	SLPlayItf audioPlayerPlay = nullptr;
 
-	int packetBufferSize;
-	short* target;
+	int packetBufferSize = 0;
+	short* target = nullptr;
+
+    bool initedSoundTrack = false;
 
 	/**
 	 * Realize the given object. Objects needs to be
@@ -56,10 +71,17 @@ private:
 	 * Creates and output mix object.
 	 */
 	SLresult CreateOutputMix() {
-		// Create output mix object
-		return (*engineEngine)->CreateOutputMix(engineEngine, &outputMixObject, 0, // no interfaces
-				0, // no interfaces
-				0); // no required
+        if (!engineEngine) return SL_RESULT_PRECONDITIONS_VIOLATED;
+
+        SLresult result = (*engineEngine)->CreateOutputMix(
+                engineEngine, &outputMixObject, 0, nullptr, nullptr);
+
+        if (result != SL_RESULT_SUCCESS) {
+            LOGE("CreateOutputMix failed: %d", result);
+            return result;
+        }
+
+        return (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
 	};
 	/**
 	 * Free the player buffer.
@@ -150,7 +172,7 @@ private:
 	 */
 	static void PlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
 		SoundService* service = (SoundService*) context;
-		service->producePacket(false);
+		service->producePacket();
 	};
 
 	/**
@@ -206,7 +228,7 @@ public:
 
 	void seek(const long seek_time);
 
-	void producePacket(bool isPlayInit);
+	void producePacket();
 	bool isPlaying();
 	int getCurrentTimeMills();
 

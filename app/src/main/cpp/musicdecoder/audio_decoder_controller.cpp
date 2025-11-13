@@ -74,12 +74,11 @@ int AudioDecoderController::readSapmles(short *samples, int size) {
 
 void AudioDecoderController::destroy() {
     LOGI("destroy");
-    if(NULL != audioDecoder) {
+    if (audioDecoder != nullptr) {
         audioDecoder->destroy();
         delete audioDecoder;
-        audioDecoder = NULL;
+        audioDecoder = nullptr;
     }
-    delete (&audioQueueData);
     isRunning = false;
 }
 
@@ -130,7 +129,6 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
 }
 
 int AudioDecoderController::decodeSongPacket() {
-    LOGI("decodeSongPacket----->start");
     AudioPacket* audioPacket = audioDecoder->decoderAudioPacket();
     if(audioPacket->audioSize == -1){
         return audioPacket->audioSize;

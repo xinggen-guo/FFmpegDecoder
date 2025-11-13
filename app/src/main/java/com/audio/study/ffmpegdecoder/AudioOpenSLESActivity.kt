@@ -23,14 +23,6 @@ class AudioOpenSLESActivity : AppCompatActivity() {
         binding = ActivityAudioOpenSlesactivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.jniPlayerPlay.setOnClickListener {
-            playAudioByOpenSLTest(path)
-        }
-
-        binding.jniPlayerStop.setOnClickListener {
-            stopAudioByOpenSLTest()
-        }
-
         binding.openslEsPrepare.setOnClickListener {
             songTrackController = SoundTrackController()
             songTrackController?.setOnSoundTrackListener(object : SoundTrackController.OnSoundTrackListener {
@@ -110,10 +102,6 @@ class AudioOpenSLESActivity : AppCompatActivity() {
         super.onDestroy()
         songTrackController?.stop()
     }
-
-    private external fun playAudioByOpenSLTest(audioPath: String)
-
-    private external fun stopAudioByOpenSLTest()
 
     companion object {
 

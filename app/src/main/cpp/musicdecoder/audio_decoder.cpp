@@ -109,7 +109,6 @@ AudioPacket* AudioDecoder::decoderAudioPacket() {
     } else {
         audioPacket->audioSize = -1;
     }
-    LOGI("decoderAudioPacket------>audioStartPosition:%3f", audioPacket->startPosition);
     return audioPacket;
 }
 

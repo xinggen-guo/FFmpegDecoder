@@ -19,6 +19,15 @@
 
 #define GO_CHECK_GL_ERROR(...)   LOGCATE("CHECK_GL_ERROR %s glGetError = %d, line = %d, ",  __FUNCTION__, glGetError(), __LINE__)
 
+#define SAFE_DELETE(p)         \
+    do {                       \
+        if ((p) != nullptr) {  \
+            delete (p);        \
+            (p) = nullptr;     \
+        }                      \
+    } while (0)
+#define SAFE_DELETE_ARRAY(p) { if (p) { delete[] (p); (p) = nullptr; } }
+
 static long long GetSysCurrentTime()
 {
     struct timeval time;

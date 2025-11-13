@@ -3,9 +3,9 @@
 #include "sound_service.h"
 #define LOG_TAG "SoundService"
 
-SoundService::SoundService() {
-	LOGI("SoundService::SoundService()");
-	playingState = PLAYING_STATE_STOPPED;
+SoundService::SoundService(){
+    LOGI("SoundService::SoundService()");
+    playingState = PLAYING_STATE_STOPPED;
 }
 
 SoundService::~SoundService() {
@@ -22,24 +22,52 @@ void SoundService::setOnCompletionCallback(JavaVM *g_jvm_param, jobject objParam
 	g_jvm = g_jvm_param;
 	obj = objParam;
 }
-void SoundService::producePacket(bool isPlayInit) {
-	LOGI("SoundService::producePacket() audio player call back method... ");
-	// Read data
-	short *audioBuffer = new short[packetBufferSize];
-	int result = -1;
-	if (NULL != decoderController) {
-		result = decoderController->readSapmles(target, packetBufferSize);
-		LOGI("enter SoundService::producePacket() PLAYING_STATE_PLAYING packetBufferSize=%d, result=%d, isPlayInit=%d", packetBufferSize, result, isPlayInit);
-	}
+void SoundService::producePacket() {
+    if (playingState != PLAYING_STATE_PLAYING ||
+        !decoderController || !mBuffer || !mTarget) {
+        return;
+    }
 
-	// If data is read
-	if (0 < result) { //播放数据正常读写
-		(*audioPlayerBufferQueue)->Enqueue(audioPlayerBufferQueue, audioBuffer, result * 2);
-	} else if (result == -2) {  //需要等待解码数据
+    uint8_t* frameBuffer =
+            mBuffer + mCurrentFrame * (mPacketBufferSize * sizeof(short));
 
-	} else if (result == -3) {   //播放完成，需要调用完成回调
-//		callComplete();  暂时先注掉，有问题
-	}
+    int samples = decoderController->readSapmles(mTarget, mPacketBufferSize);
+
+    if (samples > 0) {
+        memcpy(frameBuffer, mTarget, samples * sizeof(short));
+
+        (*audioPlayerBufferQueue)->Enqueue(
+                audioPlayerBufferQueue,
+                frameBuffer,
+                samples * sizeof(short));
+
+        mCurrentFrame = (mCurrentFrame + 1) % QUEUE_BUFFER_COUNT;
+
+    } else if (samples == -2) {
+        memset(frameBuffer, 0, mPacketBufferSize * sizeof(short));
+
+        (*audioPlayerBufferQueue)->Enqueue(
+                audioPlayerBufferQueue,
+                frameBuffer,
+                mPacketBufferSize * sizeof(short));
+
+        mCurrentFrame = (mCurrentFrame + 1) % QUEUE_BUFFER_COUNT;
+
+    } else if (samples == -3) {
+        playingState = PLAYING_STATE_STOPPED;
+        callComplete();
+
+    } else {
+        LOGE("producePacket: readSamples error=%d", samples);
+        memset(frameBuffer, 0, mPacketBufferSize * sizeof(short));
+
+        (*audioPlayerBufferQueue)->Enqueue(
+                audioPlayerBufferQueue,
+                frameBuffer,
+                mPacketBufferSize * sizeof(short));
+
+        mCurrentFrame = (mCurrentFrame + 1) % QUEUE_BUFFER_COUNT;
+    }
 }
 
 SLresult SoundService::RegisterPlayerCallback() {
@@ -53,32 +81,38 @@ SLresult SoundService::stop() {
 	playingState = PLAYING_STATE_STOPPED;
 	LOGI("Set the audio player state paused");
 	// Set the audio player state playing
-	SLresult result = SetAudioPlayerStateStoped();
-	if (SL_RESULT_SUCCESS != result) {
-		LOGI("Set the audio player state paused return false");
-		return result;
-	}
+    if(initedSoundTrack) {
+        SLresult result = SetAudioPlayerStateStoped();
+        if (SL_RESULT_SUCCESS != result) {
+            LOGI("Set the audio player state paused return false");
+            return result;
+        }
+    }
 	DestroyContext();
 	LOGI("out SoundService::stop()");
+    return SL_RESULT_SUCCESS;
 }
 
 SLresult SoundService::play() {
-	LOGI("enter SoundService::play()...");
+    if (!audioPlayerPlay || !audioPlayerBufferQueue || !decoderController) {
+        LOGE("play: missing components");
+        return SL_RESULT_PRECONDITIONS_VIOLATED;
+    }
 
-	// Set the audio player state playing
-	LOGI("Set the audio player state playing");
-	SLresult result = SetAudioPlayerStatePlaying();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
-	LOGI(" Enqueue the first buffer to start");
+    SLresult result = (*audioPlayerPlay)->SetPlayState(
+            audioPlayerPlay, SL_PLAYSTATE_PLAYING);
 
-	playingState = PLAYING_STATE_PLAYING;
+    if (result != SL_RESULT_SUCCESS) return result;
 
-	producePacket(true);
+    playingState = PLAYING_STATE_PLAYING;
 
-	LOGI("out SoundService::play()...");
-	return result;
+    // 播放前预塞满所有 buffer，避免卡顿
+    for (int i = 0; i < QUEUE_BUFFER_COUNT; ++i) {
+        producePacket();
+        if (playingState != PLAYING_STATE_PLAYING) break;
+    }
+
+    return SL_RESULT_SUCCESS;
 }
 
 SLresult SoundService::pause() {
@@ -111,51 +145,159 @@ void SoundService::seek(const long seek_time) {
 
 bool SoundService::initSongDecoder(const char* accompanyPath) {
 	LOGI("enter SoundService::initSongDecoder");
-	decoderController = new AudioDecoderController();
-	int* metaData = new int[2];
-	decoderController->getMusicMeta(accompanyPath, metaData);
-	accompanySampleRate = metaData[0];
-	//这个是解码器解码一个packet的buffer的大小
-	packetBufferSize =  metaData[1];
-	//我们这里预设置bufferNums个packet的buffer
-	duration = metaData[2];
-	decoderController->prepare(accompanyPath);
-//	callReady();  暂时先注掉，有问题
-	return true;
+
+    if (!accompanyPath || strlen(accompanyPath) == 0) {
+        LOGE("initSongDecoder: invalid path");
+        return false;
+    }
+
+    if (decoderController) {
+        decoderController->destroy();
+        SAFE_DELETE(decoderController);
+    }
+    SAFE_DELETE_ARRAY(mTarget);
+    SAFE_DELETE_ARRAY(mBuffer);
+
+    decoderController = new AudioDecoderController();
+    int metaData[3] = {0};
+    int ret = decoderController->getMusicMeta(accompanyPath, metaData);
+    if (ret != 0) {
+        LOGE("getMusicMeta failed, ret=%d", ret);
+        return false;
+    }
+    accompanySampleRate = metaData[0];
+    mPacketBufferSize   = metaData[1];  // 注意：这里视为“short 的个数”
+    duration            = metaData[2];
+
+    LOGI("meta: sampleRate=%d, packetBufferSize(samples)=%d, duration=%d",
+         accompanySampleRate, mPacketBufferSize, duration);
+
+    // 分配一个 packet 的 short 缓冲，用于 readSamples
+    mTarget = new short[mPacketBufferSize];
+
+    int bytesPerFrame = mPacketBufferSize * sizeof(short);
+    int bufferSize = bytesPerFrame * QUEUE_BUFFER_COUNT;
+    mBuffer = new uint8_t[bufferSize];
+
+    memset(mBuffer, 0, bufferSize);
+    mCurrentFrame = 0;
+
+    // 初始化/打开解码器
+
+    if ((decoderController->prepare(accompanyPath)) != 0) {
+        LOGE("initSongDecoder: decoder init failed");
+        return false;
+    }
+    callReady();
+    LOGI("initSongDecoder: OK");
+    return true;
 }
 
-void SoundService::callReady(){
-	JNIEnv *env;
-	//Attach主线程
-	if (g_jvm->AttachCurrentThread(&env, NULL) != JNI_OK) {
-		LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
-	}
-	jclass jcls = env->GetObjectClass(obj);
-	jmethodID onCompletionCallBack = env->GetMethodID(jcls, "onReady", "()V");
-	LOGI("before env->CallVoidMethod");
-	env->CallVoidMethod(obj, onCompletionCallBack);
-	LOGI("after env->CallVoidMethod");
-	//Detach主线程
-	if (g_jvm->DetachCurrentThread() != JNI_OK) {
-		LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
-	}
+void SoundService::callReady() {
+    JNIEnv* env = nullptr;
+    bool needDetach = false;
+
+    // 1. 尝试获取当前线程的 JNIEnv
+    jint getEnvResult = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvResult == JNI_EDETACHED) {
+        // 当前线程还没附加 → 附加一下
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
+            return;
+        }
+        needDetach = true;
+    } else if (getEnvResult != JNI_OK) {
+        LOGE("%s: GetEnv() failed, result=%d", __FUNCTION__, getEnvResult);
+        return;
+    }
+
+    // 2. 调 Java 方法
+    jclass cls = env->GetObjectClass(obj);
+    if (!cls) {
+        LOGE("%s: GetObjectClass() returned null", __FUNCTION__);
+        if (needDetach) g_jvm->DetachCurrentThread();
+        return;
+    }
+
+    jmethodID mid = env->GetMethodID(cls, "onReady", "()V");
+    if (!mid) {
+        LOGE("%s: GetMethodID(onReady) failed", __FUNCTION__);
+        env->DeleteLocalRef(cls);
+        if (needDetach) g_jvm->DetachCurrentThread();
+        return;
+    }
+
+    LOGI("before CallVoidMethod onReady");
+    env->CallVoidMethod(obj, mid);
+    LOGI("after CallVoidMethod onReady");
+
+    // 处理潜在异常（建议加上）
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+
+    env->DeleteLocalRef(cls);
+
+    if (needDetach) {
+        if (g_jvm->DetachCurrentThread() != JNI_OK) {
+            LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
+        }
+    }
 }
 
 void SoundService::callComplete() {
-	JNIEnv *env;
-	//Attach主线程
-	if (g_jvm->AttachCurrentThread(&env, NULL) != JNI_OK) {
-		LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
-	}
-	jclass jcls = env->GetObjectClass(obj);
-	jmethodID onCompletionCallBack = env->GetMethodID(jcls, "onCompletion", "()V");
-	LOGI("before env->CallVoidMethod");
-	env->CallVoidMethod(obj, onCompletionCallBack);
-	LOGI("after env->CallVoidMethod");
-	//Detach主线程
-	if (g_jvm->DetachCurrentThread() != JNI_OK) {
-		LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
-	}
+    JNIEnv* env = nullptr;
+    bool needDetach = false;
+
+    // 1. 先检查当前线程是否已经附加到 JVM
+    jint getEnvResult = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvResult == JNI_EDETACHED) {
+        // 还没附加 → Attach 一次
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            LOGE("%s: AttachCurrentThread() failed", __FUNCTION__);
+            return;
+        }
+        needDetach = true;  // 只对自己 attach 的线程执行 detach
+    } else if (getEnvResult != JNI_OK) {
+        LOGE("%s: GetEnv() failed, result=%d", __FUNCTION__, getEnvResult);
+        return;
+    }
+
+    // 2. 调用 Java 层 onCompletion()
+    jclass cls = env->GetObjectClass(obj);
+    if (!cls) {
+        LOGE("%s: GetObjectClass() returned null", __FUNCTION__);
+        if (needDetach) g_jvm->DetachCurrentThread();
+        return;
+    }
+
+    jmethodID mid = env->GetMethodID(cls, "onCompletion", "()V");
+    if (!mid) {
+        LOGE("%s: GetMethodID(onCompletion) failed", __FUNCTION__);
+        env->DeleteLocalRef(cls);
+        if (needDetach) g_jvm->DetachCurrentThread();
+        return;
+    }
+
+    LOGI("before CallVoidMethod onCompletion");
+    env->CallVoidMethod(obj, mid);
+    LOGI("after CallVoidMethod onCompletion");
+
+    // 如果 Java 抛异常，打印一下避免一直挂着
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+
+    env->DeleteLocalRef(cls);
+
+    // 3. 只在自己 Attach 的情况下 Detach
+    if (needDetach) {
+        if (g_jvm->DetachCurrentThread() != JNI_OK) {
+            LOGE("%s: DetachCurrentThread() failed", __FUNCTION__);
+        }
+    }
 }
 
 SLresult SoundService::initSoundTrack() {
@@ -172,13 +314,6 @@ SLresult SoundService::initSoundTrack() {
 	LOGI("Create output mix object");
 	// Create output mix object
 	result = CreateOutputMix();
-	if (SL_RESULT_SUCCESS != result) {
-		return result;
-	}
-
-	LOGI("Realize output mix object");
-	// Realize output mix object
-	result = RealizeObject(outputMixObject);
 	if (SL_RESULT_SUCCESS != result) {
 		return result;
 	}
@@ -221,6 +356,8 @@ SLresult SoundService::initSoundTrack() {
 		return result;
 	}
 	LOGI("leave init");
+
+    initedSoundTrack = true;
 	return SL_RESULT_SUCCESS;
 }
 
@@ -233,24 +370,35 @@ bool SoundService::isPlaying() {
 }
 
 void SoundService::DestroyContext() {
-//	pthread_mutex_lock(&mLock);
-	LOGI("enter SoundService::DestroyContext");
-	// Destroy audio player object
-	DestroyObject(audioPlayerObject);
-	LOGI("after destroy audioPlayerObject");
-	// Free the player buffer
-	FreePlayerBuffer();
-	LOGI("after FreePlayerBuffer");
-	// Destroy output mix object
-	DestroyObject(outputMixObject);
-	LOGI("after destroy outputMixObject");
-	//destroy mad decoder
-	if (NULL != decoderController) {
-		decoderController->destroy();
-		delete decoderController;
-		decoderController = NULL;
-	}
-	LOGI("leave SoundService::DestroyContext");
+    LOGI("DestroyContext");
+    playingState = PLAYING_STATE_STOPPED;
+
+    initedSoundTrack = false;
+
+    if (audioPlayerObject) {
+        (*audioPlayerObject)->Destroy(audioPlayerObject);
+        audioPlayerObject = nullptr;
+        audioPlayerPlay = nullptr;
+        audioPlayerBufferQueue = nullptr;
+    }
+
+    if (outputMixObject) {
+        (*outputMixObject)->Destroy(outputMixObject);
+        outputMixObject = nullptr;
+    }
+
+    // 先释放解码器内部资源
+    if (decoderController) {
+        decoderController->destroy();   // 只做内部资源释放，不 delete this
+    }
+    // 缓冲区
+    SAFE_DELETE_ARRAY(mBuffer);
+    SAFE_DELETE_ARRAY(mTarget);
+
+    // 再释放控制器对象本身
+    SAFE_DELETE(decoderController);
+
+    LOGI("DestroyContext~~~~~");
 }
 
 int SoundService::getDurationTimeMills() {

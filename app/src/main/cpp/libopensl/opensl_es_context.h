@@ -3,6 +3,9 @@
 
 #include "opensl_es_util.h"
 #include "../common/CommonTools.h"
+#include <CommonTools.h>
+
+#define LOG_TAG "OpenSLESContext"
 
 class OpenSLESContext {
 private:
@@ -13,15 +16,11 @@ private:
 	 * Creates an OpenSL ES engine.
 	 */
 	SLresult createEngine() {
-		// OpenSL ES for Android is designed to be thread-safe,
-		// so this option request will be ignored, but it will
-		// make the source code portable to other platforms.
-		SLEngineOption engineOptions[] = { { (SLuint32) SL_ENGINEOPTION_THREADSAFE, (SLuint32) SL_BOOLEAN_TRUE } };
-
-		// Create the OpenSL ES engine object
-		return slCreateEngine(&engineObject, ARRAY_LEN(engineOptions), engineOptions, 0, // no interfaces
-				0, // no interfaces
-				0); // no required
+        SLresult result = slCreateEngine(&engineObject, 0, nullptr, 0, nullptr, nullptr);
+        if (result != SL_RESULT_SUCCESS) {
+            LOGE("slCreateEngine failed: %d", result);
+        }
+        return result;
 	};
 	/**
 	 * Realize the given object. Objects needs to be
