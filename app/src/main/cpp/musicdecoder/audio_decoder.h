@@ -21,18 +21,18 @@ extern "C" {
 
 #define LOG_TAG "AudioDecoderLog"
 
-typedef struct AudioPacket{
+struct PcmFrame{
     short *audioBuffer;
     int audioSize;
     float duration;
     float startPosition;
-    AudioPacket(){
+    PcmFrame(){
         audioBuffer = NULL;
         audioSize = 0;
         duration = 0;
         startPosition = 0;
     }
-    ~AudioPacket(){
+    ~PcmFrame(){
         if (NULL != audioBuffer) {
             delete[] audioBuffer;
             audioSize = 0;
@@ -40,7 +40,7 @@ typedef struct AudioPacket{
             startPosition = 0;
         }
     }
-} AudioPacket;
+};
 
 class AudioDecoder {
 
@@ -73,7 +73,7 @@ public:
     bool audioCodecIsSupported();
     void destroy();
     void prepare();
-    AudioPacket* decoderAudioPacket();
+    PcmFrame* decoderAudioPacket();
     int readSampleData(short *pInt, int size);
     int readFrame();
     int getDuration();

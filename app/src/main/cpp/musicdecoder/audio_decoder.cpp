@@ -95,12 +95,12 @@ void AudioDecoder::prepare() {
     avFrame = av_frame_alloc();
 }
 
-AudioPacket* AudioDecoder::decoderAudioPacket() {
+PcmFrame* AudioDecoder::decoderAudioPacket() {
     audioDuration = 0;
     audioStartPosition = 0;
     short *resample = new short[packetBufferSize];
     int stereoSampleSize = readSampleData(resample, packetBufferSize);
-    AudioPacket *audioPacket = new AudioPacket();
+    PcmFrame *audioPacket = new PcmFrame();
     if (stereoSampleSize > 0) {
         audioPacket->audioBuffer = resample;
         audioPacket->audioSize = stereoSampleSize;

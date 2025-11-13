@@ -31,7 +31,7 @@ void SoundService::producePacket() {
     uint8_t* frameBuffer =
             mBuffer + mCurrentFrame * (mPacketBufferSize * sizeof(short));
 
-    int samples = decoderController->readSapmles(mTarget, mPacketBufferSize);
+    int samples = decoderController->readSamples(mTarget, mPacketBufferSize);
 
     if (samples > 0) {
         memcpy(frameBuffer, mTarget, samples * sizeof(short));

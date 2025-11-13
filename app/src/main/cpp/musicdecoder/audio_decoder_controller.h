@@ -6,7 +6,7 @@
 #define FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
 
 
-#define QUEUE_SIZE_MAX_THRESHOLD 30
+#define QUEUE_SIZE_MAX_THRESHOLD 60
 #define QUEUE_SIZE_MIN_THRESHOLD 25
 
 #include "audio_decoder.h"
@@ -20,7 +20,7 @@ class AudioDecoderController{
 private:
     AudioDecoder *audioDecoder;
     pthread_t audioDecoderThread;
-    std::queue<AudioPacket *> audioQueueData;
+    std::queue<PcmFrame *> audioFrameQueue;
     bool isRunning;
     pthread_mutex_t mLock;
     pthread_cond_t mCondition;
@@ -56,9 +56,8 @@ public:
 
     void destroy();
 
-    int readSapmles(short *pInt, int i);
+    int readSamples(short *pInt, int i);
 
 };
-
 
 #endif //FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H

@@ -43,7 +43,7 @@ JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_readSamples(JNIEnv *env, jobject thiz, jshortArray samples, jint size) {
     if (NULL != audioDecoderController) {
         short *samplesArray = env->GetShortArrayElements(samples, NULL);
-        int result = audioDecoderController->readSapmles(samplesArray, size);
+        int result = audioDecoderController->readSamples(samplesArray, size);
         env->ReleaseShortArrayElements(samples, samplesArray, 0);
         return result;
     }
