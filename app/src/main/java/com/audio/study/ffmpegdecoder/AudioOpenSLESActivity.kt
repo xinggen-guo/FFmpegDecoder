@@ -10,6 +10,7 @@ import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
+import java.util.concurrent.Delayed
 
 class AudioOpenSLESActivity : AppCompatActivity() {
 
@@ -46,6 +47,23 @@ class AudioOpenSLESActivity : AppCompatActivity() {
         }
     }
 
+    private var isSeek = false  // same flag, or expose from listener
+    private var progressJobRunning = false
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            if (!progressJobRunning) return
+
+            // ⛔️ Don't touch SeekBar while user is dragging
+            if (!isSeek) {
+                val progress = songTrackController?.getProgress() ?: 0
+                binding.progress.text = formatSecond(progress.toLong())
+                binding.audioProgress.progress = progress
+            }
+
+            uiHandler.postDelayed(this, 100)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAudioOpenSlesactivityBinding.inflate(layoutInflater)
@@ -56,7 +74,7 @@ class AudioOpenSLESActivity : AppCompatActivity() {
             songTrackController?.setOnSoundTrackListener(object : SoundTrackController.OnSoundTrackListener {
                 override fun onCompletion() {
                     LogUtil.i("onCompletion")
-                    stopUpdateAudioProgress()
+                    stopProgressUpdate()
                     if(visualizerRunning){
                         uiHandler.removeCallbacksAndMessages(null)
                     }
@@ -85,42 +103,48 @@ class AudioOpenSLESActivity : AppCompatActivity() {
 
         binding.openslEsStart.setOnClickListener {
             songTrackController?.play()
-            startUpdateAudioProgress()
+            startProgressUpdate()
             checkOpenVisualizer(visualizerRunning)
         }
 
         binding.openslEsPause.setOnClickListener {
-            stopUpdateAudioProgress()
+            stopProgressUpdate()
             songTrackController?.pause()
         }
 
         binding.openslEsResume.setOnClickListener {
             songTrackController?.resume()
-            startUpdateAudioProgress()
+            startProgressUpdate()
         }
 
         binding.openslEsDestroy.setOnClickListener {
-            stopUpdateAudioProgress()
+            stopProgressUpdate()
             songTrackController?.stop()
         }
 
         binding.audioProgress.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
 
             var isSeek = false
+            var pendingProgress = 0
 
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if(isSeek) {
-                    songTrackController?.seek(progress)
+                if (isSeek && fromUser) {
+                    pendingProgress = progress
                 }
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
                 isSeek = true
                 songTrackController?.pause()
+                stopProgressUpdate()
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                if(isSeek){
+                    songTrackController?.seek(pendingProgress)
+                }
                 songTrackController?.resume()
+                startProgressUpdate()
                 isSeek = false
             }
 
@@ -136,17 +160,14 @@ class AudioOpenSLESActivity : AppCompatActivity() {
         }
     }
 
-    private fun stopUpdateAudioProgress() {
-        handler.removeCallbacksAndMessages(null)
+    private fun startProgressUpdate() {
+        progressJobRunning = true
+        uiHandler.post(progressRunnable)
     }
 
-    private fun startUpdateAudioProgress() {
-        handler.postDelayed({
-            val progress = songTrackController?.getProgress() ?: 0
-            binding.progress.text = formatSecond(progress.toLong())
-            binding.audioProgress.progress = progress
-            startUpdateAudioProgress()
-        }, 50)
+    private fun stopProgressUpdate() {
+        progressJobRunning = false
+        uiHandler.removeCallbacks(progressRunnable)
     }
 
     override fun onDestroy() {

@@ -66,10 +66,11 @@ class AudioTrackerActivity : AppCompatActivity() {
         binding.audioProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
 
             var isSeek = false
+            var pendingProgress = 0
 
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (isSeek) {
-                    nativePlayController?.seek(progress)
+                if (isSeek && fromUser) {
+                    pendingProgress = progress
                 }
             }
 
@@ -79,6 +80,9 @@ class AudioTrackerActivity : AppCompatActivity() {
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                if(isSeek){
+                    nativePlayController?.seek(pendingProgress)
+                }
                 nativePlayController?.resume()
                 isSeek = false
             }

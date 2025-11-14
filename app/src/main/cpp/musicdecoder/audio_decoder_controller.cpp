@@ -28,10 +28,16 @@ int AudioDecoderController::prepare(const char *audioPath) {
 }
 
 void AudioDecoderController::seek(const long seek_time) {
+
+    pthread_mutex_lock(&mLock);
+
     needSeek = true;
     seekTime = seek_time;
 
-    int getLockCode = pthread_mutex_lock(&mLock);
+    //Immediately update “public” time so UI gets the new value
+    progress = static_cast<int>(seek_time);
+
+    // wake decode thread to apply the real seek
     pthread_cond_signal(&mCondition);
     pthread_mutex_unlock(&mLock);
 }
