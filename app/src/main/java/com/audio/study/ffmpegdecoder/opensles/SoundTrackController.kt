@@ -41,6 +41,12 @@ class SoundTrackController : NativeOnSoundTrackListener {
      */
     external fun getProgress(): Int
 
+    external fun setVisualizerEnable(d: Boolean)
+
+    external fun nativeGetSpectrum(spectrum: FloatArray)
+
+    external fun nativeGetWaveform(spectrum: FloatArray)
+
     /**
      * 获取文件时长
      */
@@ -59,6 +65,7 @@ class SoundTrackController : NativeOnSoundTrackListener {
         this.onSoundTrackListener = onSoundTrackListener
     }
 
+
     interface OnSoundTrackListener {
         fun onCompletion()
         fun onReady()
@@ -68,4 +75,5 @@ class SoundTrackController : NativeOnSoundTrackListener {
 interface NativeOnSoundTrackListener {
     fun onCompletion()
     fun onReady()
+
 }

@@ -4,6 +4,7 @@
 
 #include <CommonTools.h>
 #include "audio_decoder_controller.h"
+#include "audio_visualizer.h"
 
 int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) {
     int result = 0;
@@ -39,12 +40,20 @@ int AudioDecoderController::getProgress() {
     return progress;
 }
 
+void AudioDecoderController::setVisualizerEnabled(bool enabled) {
+    visualizerEnabled = enabled;
+}
+
+bool AudioDecoderController::isVisualizerEnabled() const {
+    return visualizerEnabled;
+}
+
 int AudioDecoderController::readSamples(short *samples, int size) {
     LOGI("readSamples");
     int result = 0;
-    if(!audioFrameQueue.empty() && !needSeek){
+    if (!audioFrameQueue.empty() && !needSeek) {
         PcmFrame *audioPacket = audioFrameQueue.front();
-        if(audioPacket->audioSize == -1){
+        if (audioPacket->audioSize == -1) {
             result = -1;
         } else {
             short *dataSamples = audioPacket->audioBuffer;
@@ -52,22 +61,29 @@ int AudioDecoderController::readSamples(short *samples, int size) {
             progress = audioPacket->startPosition;
             audioFrameQueue.pop();
             result = audioPacket->audioSize;
+
+            if (visualizerEnabled) {
+                AudioVisualizer::instance().onPcmData(
+                        dataSamples,
+                        audioPacket->audioSize,
+                        audioDecoder->getSampleRate());
+            }
         }
         delete audioPacket;
     } else {
-        if(isRunning || needSeek){
+        if (isRunning || needSeek) {
             result = -2;
-        } else{
+        } else {
             result = -3;
         }
     }
-    if(audioFrameQueue.size() < QUEUE_SIZE_MIN_THRESHOLD && isRunning){
+    if (audioFrameQueue.size() < QUEUE_SIZE_MIN_THRESHOLD && isRunning) {
         int getLockCode = pthread_mutex_lock(&mLock);
         if (result != -1) {
             pthread_cond_signal(&mCondition);
         }
         LOGI("pthread_mutex_unlock----->222222");
-        pthread_mutex_unlock (&mLock);
+        pthread_mutex_unlock(&mLock);
     }
     return result;
 }
@@ -91,8 +107,8 @@ void AudioDecoderController::initDecoderThread() {
     pthread_create(&audioDecoderThread, NULL, startDecoderThread, this);
 }
 
-void* AudioDecoderController::startDecoderThread(void *ptr) {
-    AudioDecoderController* decoderController =
+void *AudioDecoderController::startDecoderThread(void *ptr) {
+    AudioDecoderController *decoderController =
             (AudioDecoderController *) ptr;
     int getLockCode = pthread_mutex_lock(&decoderController->mLock);
     while (decoderController->isRunning) {
@@ -129,12 +145,18 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
 }
 
 int AudioDecoderController::decodeSongPacket() {
-    PcmFrame* audioPacket = audioDecoder->decoderAudioPacket();
-    if(audioPacket->audioSize == -1){
+    PcmFrame *audioPacket = audioDecoder->decoderAudioPacket();
+    if (audioPacket->audioSize == -1) {
         int ret = audioPacket->audioSize;
         delete audioPacket;
         return ret;
     } else {
+        if (isVisualizerEnabled()) {
+            AudioVisualizer::instance().onPcmData(
+                    audioPacket->audioBuffer,
+                    audioPacket->audioSize,
+                    audioDecoder->getSampleRate());
+        }
         audioFrameQueue.push(audioPacket);
         return 1;
     }

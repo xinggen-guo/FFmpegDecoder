@@ -405,3 +405,7 @@ int SoundService::getDurationTimeMills() {
 	return duration;
 }
 
+void SoundService::setVisualizerEnabled(bool enabled) {
+    decoderController->setVisualizerEnabled(enabled);
+}
+

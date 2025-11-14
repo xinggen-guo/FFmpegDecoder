@@ -43,7 +43,6 @@ import androidx.core.text.TextDirectionHeuristicsCompat;
 
 /**
  * 资源操作工具
- * Created by renpeng on 2016/12/7.
  */
 
 public class ResourceUtils {

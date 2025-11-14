@@ -238,6 +238,8 @@ public:
 	void DestroyContext();
 	int getDurationTimeMills();
 
+    void setVisualizerEnabled(bool enabled);
+
 	void callReady();
 
 	void callComplete();

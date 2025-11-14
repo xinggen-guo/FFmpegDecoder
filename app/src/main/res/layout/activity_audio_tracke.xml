@@ -1,70 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".AudioTrackerActivity">
-
-    <Button
-        android:id="@+id/audio_track_prepare"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="audioTrackPrepare"
-        android:textAllCaps="false"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/audio_track_start"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="audioTrackStart"
-        android:textAllCaps="false"
-        app:layout_constraintTop_toBottomOf="@id/audio_track_prepare" />
-
-    <Button
-        android:id="@+id/audio_track_pause"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="audioTrackPause"
-        android:textAllCaps="false"
-        app:layout_constraintTop_toBottomOf="@id/audio_track_start" />
-
-
-    <Button
-        android:id="@+id/audio_track_destroy"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="audioTrackDestroy"
-        android:textAllCaps="false"
-        app:layout_constraintTop_toBottomOf="@id/audio_track_pause" />
-
-
-    <androidx.appcompat.widget.AppCompatSeekBar
-        android:id="@+id/audio_progress"
-        android:layout_width="match_parent"
-        android:layout_height="20dp"
-        app:layout_constraintTop_toBottomOf="@id/audio_track_destroy" />
-
-    <TextView
-        android:id="@+id/progress"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:text="00:00"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/audio_progress" />
-
-
-    <TextView
-        android:id="@+id/duration"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="10dp"
-        android:text="00:00"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/audio_progress" />
-
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	tools:context=".AudioTrackerActivity">
+	
+	<Button
+		android:id="@+id/audio_track_prepare"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="audioTrackPrepare"
+		android:textAllCaps="false"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintTop_toTopOf="parent" />
+	
+	<Button
+		android:id="@+id/audio_track_start"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="audioTrackStart"
+		android:textAllCaps="false"
+		app:layout_constraintTop_toBottomOf="@id/audio_track_prepare" />
+	
+	<Button
+		android:id="@+id/audio_track_pause"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="audioTrackPause"
+		android:textAllCaps="false"
+		app:layout_constraintTop_toBottomOf="@id/audio_track_start" />
+	
+	
+	<Button
+		android:id="@+id/audio_track_destroy"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="audioTrackDestroy"
+		android:textAllCaps="false"
+		app:layout_constraintTop_toBottomOf="@id/audio_track_pause" />
+	
+	
+	<androidx.appcompat.widget.AppCompatSeekBar
+		android:id="@+id/audio_progress"
+		android:layout_width="match_parent"
+		android:layout_height="20dp"
+		app:layout_constraintTop_toBottomOf="@id/audio_track_destroy" />
+	
+	<TextView
+		android:id="@+id/progress"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_marginStart="10dp"
+		android:text="00:00"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/audio_progress" />
+	
+	
+	<TextView
+		android:id="@+id/duration"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_marginEnd="10dp"
+		android:text="00:00"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintTop_toBottomOf="@id/audio_progress" />
+	
 </androidx.constraintlayout.widget.ConstraintLayout>

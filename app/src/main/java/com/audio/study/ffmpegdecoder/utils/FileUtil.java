@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * @Author Liudeli
  * @Describe：文件相关工具类
  */
 public class FileUtil {

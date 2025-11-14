@@ -38,6 +38,8 @@ private:
     /** 销毁解码线程 **/
     virtual void destroyDecoderThread();
 
+    bool visualizerEnabled = false;  // default: no visual generation
+
 public:
     int dataSize;
 
@@ -58,6 +60,9 @@ public:
 
     int readSamples(short *pInt, int i);
 
+    // turn visualization on/off
+    void setVisualizerEnabled(bool enabled);
+    bool isVisualizerEnabled() const;
 };
 
 #endif //FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
