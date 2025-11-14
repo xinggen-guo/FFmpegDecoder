@@ -6,6 +6,7 @@ import android.os.Handler
 import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioOpenSlesactivityBinding
 import com.audio.study.ffmpegdecoder.opensles.SoundTrackController
+import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
@@ -54,7 +55,12 @@ class AudioOpenSLESActivity : AppCompatActivity() {
             songTrackController = SoundTrackController()
             songTrackController?.setOnSoundTrackListener(object : SoundTrackController.OnSoundTrackListener {
                 override fun onCompletion() {
+                    LogUtil.i("onCompletion")
                     stopUpdateAudioProgress()
+                    if(visualizerRunning){
+                        uiHandler.removeCallbacksAndMessages(null)
+                    }
+                    ToastUtils.showLong("complete")
                     songTrackController?.stop()
                 }
 

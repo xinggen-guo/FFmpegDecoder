@@ -88,6 +88,7 @@ SLresult SoundService::stop() {
             return result;
         }
     }
+
 	DestroyContext();
 	LOGI("out SoundService::stop()");
     return SL_RESULT_SUCCESS;
@@ -249,6 +250,15 @@ void SoundService::callReady() {
 void SoundService::callComplete() {
     JNIEnv* env = nullptr;
     bool needDetach = false;
+    LOGE("callComplete");
+    if (!g_jvm) {
+        LOGE("%s: g_jvm is null", __FUNCTION__);
+        return;
+    }
+    if (!obj) {
+        LOGE("%s: obj is null (no global ref)", __FUNCTION__);
+        return;
+    }
 
     // 1. 先检查当前线程是否已经附加到 JVM
     jint getEnvResult = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
@@ -391,6 +401,7 @@ void SoundService::DestroyContext() {
     if (decoderController) {
         decoderController->destroy();   // 只做内部资源释放，不 delete this
     }
+
     // 缓冲区
     SAFE_DELETE_ARRAY(mBuffer);
     SAFE_DELETE_ARRAY(mTarget);

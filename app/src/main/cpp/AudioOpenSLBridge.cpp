@@ -18,7 +18,7 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_setAudioDataSou
     soundService = SoundService::GetInstance();
     JavaVM *g_jvm;
     env->GetJavaVM(&g_jvm);
-    soundService->setOnCompletionCallback(g_jvm, callBack);
+    soundService->setOnCompletionCallback(g_jvm,  env->NewGlobalRef(callBack));
     return soundService->initSongDecoder(audioPath);
 }
 extern "C"

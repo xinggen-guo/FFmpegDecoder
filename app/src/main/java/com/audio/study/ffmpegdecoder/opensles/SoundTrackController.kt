@@ -1,5 +1,7 @@
 package com.audio.study.ffmpegdecoder.opensles
 
+import com.audio.study.ffmpegdecoder.utils.LogUtil
+
 class SoundTrackController : NativeOnSoundTrackListener {
 
     /**
@@ -53,11 +55,15 @@ class SoundTrackController : NativeOnSoundTrackListener {
     external fun getDuration(): Int
 
     override fun onCompletion() {
+        LogUtil.i("onCompletion---1111")
         onSoundTrackListener?.onCompletion()
+        LogUtil.i("onCompletion---22222")
     }
 
     override fun onReady(){
+        LogUtil.i("onReady---1111")
         onSoundTrackListener?.onReady()
+        LogUtil.i("onReady---22222")
     }
 
     private var onSoundTrackListener: OnSoundTrackListener? = null

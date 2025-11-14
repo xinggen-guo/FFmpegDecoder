@@ -14,6 +14,7 @@ import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
 import com.audio.study.ffmpegdecoder.databinding.ActivityMainBinding
 import com.audio.study.ffmpegdecoder.utils.FileUtil
 import com.audio.study.ffmpegdecoder.utils.LogUtil
+import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
 
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        ToastUtils.init(this.applicationContext)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
