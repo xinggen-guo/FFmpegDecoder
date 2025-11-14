@@ -9,7 +9,7 @@ project("ffmpegdecoder")
 
 set(COMMON "${CMAKE_SOURCE_DIR}/common")
 set(FFMPEG_DIR "${CMAKE_SOURCE_DIR}/ffmpeg")
-set(MUSIC_DECODER "${CMAKE_SOURCE_DIR}/musicdecoder")
+set(MUSIC_DECODER "${CMAKE_SOURCE_DIR}/decoder")
 set(OPEN_SL_DIR "${CMAKE_SOURCE_DIR}/libopensl")
 set(OPEN_GL_DIR "${CMAKE_SOURCE_DIR}/render")
 

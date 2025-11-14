@@ -3,7 +3,7 @@
 //
 
 #include <jni.h>
-#include "musicdecoder/audio_decoder_controller.h"
+#include "audio_decoder_controller.h"
 
 AudioDecoderController *audioDecoderController;
 

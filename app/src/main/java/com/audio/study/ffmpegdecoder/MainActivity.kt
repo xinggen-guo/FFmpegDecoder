@@ -30,9 +30,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.mp3CreateFile.setOnClickListener {
-            val path = application.externalCacheDir?.absolutePath + File.separator + "audio_study"
+            val path = application.externalCacheDir?.absolutePath + File.separator + Constants.NAME_DIR
             val result = FileUtil.createOrExistsDir(path)
             LogUtil.i(TAG, "createResult:${result}---->path:${path}")
+
+            Thread {
+                val pathAudio = FileUtil.getTheAudioPath(this)
+                val pathVideo = FileUtil.getTheVideoPath(this)
+                FileUtil.copyFilesAssets(this, Constants.NAME_AUDIO, pathAudio)
+                FileUtil.copyFilesAssets(this, Constants.NAME_VIDEO, pathVideo)
+            }.start()
         }
 
         binding.audioTrackerPlay.setOnClickListener {
@@ -44,6 +51,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.audioOpenGL.setOnClickListener {
             startActivity(Intent(this, OpenGLActivity::class.java))
+        }
+        binding.videoSample.setOnClickListener {
+            startActivity(Intent(this, VideoPlayerActivity::class.java))
         }
     }
 

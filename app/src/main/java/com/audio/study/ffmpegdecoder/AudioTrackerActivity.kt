@@ -19,15 +19,10 @@ class AudioTrackerActivity : AppCompatActivity() {
 
     private var handler = Handler()
 
-    val path by lazy { application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "input.mp3" }
+    val path by lazy { FileUtil.getTheAudioPath(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        Thread {
-            FileUtil.copyFilesAssets(this, "input.mp3", path)
-        }.start()
-
         binding = ActivityAudioTrackeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

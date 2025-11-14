@@ -36,6 +36,11 @@
             android:label="OpenGLDemo"
             android:screenOrientation="portrait"
             android:exported="false" />
+        <activity
+            android:name=".VideoPlayerActivity"
+            android:label="VideoPlayerDemo"
+            android:screenOrientation="portrait"
+            android:exported="false" />
     </application>
 
 </manifest>

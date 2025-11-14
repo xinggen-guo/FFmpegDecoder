@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 
+import com.audio.study.ffmpegdecoder.Constants;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -1227,6 +1229,15 @@ public class FileUtil {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+
+    public static String getTheAudioPath(Context context){
+        return context.getExternalCacheDir().getAbsolutePath() + File.separator + Constants.NAME_DIR + File.separator + Constants.NAME_AUDIO;
+    }
+
+    public static String getTheVideoPath(Context context){
+        return context.getExternalCacheDir().getAbsolutePath() + File.separator + Constants.NAME_DIR + File.separator + Constants.NAME_VIDEO;
     }
 
 }

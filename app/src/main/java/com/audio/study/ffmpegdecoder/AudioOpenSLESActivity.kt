@@ -6,6 +6,7 @@ import android.os.Handler
 import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioOpenSlesactivityBinding
 import com.audio.study.ffmpegdecoder.opensles.SoundTrackController
+import com.audio.study.ffmpegdecoder.utils.FileUtil
 import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.utils.formatSecond
@@ -16,9 +17,7 @@ class AudioOpenSLESActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAudioOpenSlesactivityBinding
 
-    private var handler = Handler()
-
-    val path by lazy { application.externalCacheDir?.absolutePath + File.separator + "audio_study" + File.separator + "input.mp3" }
+    val path by lazy { FileUtil.getTheAudioPath(this) }
     var songTrackController: SoundTrackController? = null
 
     private val spectrumSize = 32
