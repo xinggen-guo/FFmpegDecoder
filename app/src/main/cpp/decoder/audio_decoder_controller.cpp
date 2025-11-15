@@ -5,6 +5,7 @@
 #include <CommonTools.h>
 #include "audio_decoder_controller.h"
 #include "audio_visualizer.h"
+#include "media_status.h"
 
 int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) {
     int result = 0;
@@ -60,7 +61,7 @@ int AudioDecoderController::readSamples(short *samples, int size) {
     if (!audioFrameQueue.empty() && !needSeek) {
         PcmFrame *audioPacket = audioFrameQueue.front();
         if (audioPacket->audioSize == -1) {
-            result = -1;
+            result = MEDIA_STATUS_ERROR;
         } else {
             short *dataSamples = audioPacket->audioBuffer;
             memcpy(samples, dataSamples, audioPacket->audioSize * 2);
@@ -78,7 +79,7 @@ int AudioDecoderController::readSamples(short *samples, int size) {
         delete audioPacket;
     } else {
         if (isRunning || needSeek) {
-            result = -2;
+            result = MEDIA_STATUS_BUFFERING;
         } else {
             result = -3;
         }
@@ -88,7 +89,6 @@ int AudioDecoderController::readSamples(short *samples, int size) {
         if (result != -1) {
             pthread_cond_signal(&mCondition);
         }
-        LOGI("pthread_mutex_unlock----->222222");
         pthread_mutex_unlock(&mLock);
     }
     return result;

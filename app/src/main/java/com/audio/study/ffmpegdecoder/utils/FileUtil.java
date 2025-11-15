@@ -6,7 +6,7 @@ import android.net.Uri;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 
-import com.audio.study.ffmpegdecoder.Constants;
+import com.audio.study.ffmpegdecoder.common.Constants;
 
 import java.io.BufferedInputStream;
 import java.io.File;

@@ -25,14 +25,33 @@ class VideoPlayerActivity : AppCompatActivity() {
         binding = ActivityVideoPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.btnOpenVideo.setOnClickListener {
+        binding.simpleVideoView.onPrepared = { w, h ->
+            // Called when prepare is finished
+            ToastUtils.showShort("Prepared: ${w}x${h}, you can press Play now")
+            binding.btnPlay.isEnabled = true
+        }
+
+        binding.btnPrepare.setOnClickListener {
             val path = demoVideoPath
-            val file = File(path)
-            if (!file.exists()) {
-                ToastUtils.showShort("Video file not found: $path")
+            if (!File(path).exists()) {
+                ToastUtils.showShort("File not found: $path")
             } else {
-                binding.simpleVideoView.setVideoPath(path)
+                binding.btnPrepare.isEnabled = false
+                binding.simpleVideoView.prepare(path)
             }
         }
+
+        binding.btnPlay.setOnClickListener {
+            binding.simpleVideoView.play()
+        }
+
+        binding.btnPause.setOnClickListener {
+            binding.simpleVideoView.pause()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        binding.simpleVideoView.release()
     }
 }

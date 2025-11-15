@@ -7,6 +7,7 @@ import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import com.audio.study.ffmpegdecoder.common.MediaStatus
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.video.VideoPlayer
 import java.nio.ByteBuffer
@@ -16,6 +17,7 @@ import java.nio.ByteBuffer
  * @date 2025/11/14 19:44
  * @description
  */
+
 class SimpleVideoView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -33,27 +35,69 @@ class SimpleVideoView @JvmOverloads constructor(
     private var surfaceReady = false
 
     @Volatile
-    private var videoPath: String? = null
+    private var prepared = false
+
+    @Volatile
+    private var isPlaying = false
+
+    private var videoWidth = 0
+    private var videoHeight = 0
+
+    /** Expose prepare callback to Activity */
+    var onPrepared: ((width: Int, height: Int) -> Unit)? = null
 
     init {
         holder.addCallback(this)
+
+        videoPlayer.onPrepared = { w, h ->
+            videoWidth = w
+            videoHeight = h
+            prepared = true
+            ToastUtils.showShort("Video prepared: ${w}x${h}")
+            // Notify outside (Activity) – Activity decides when to call play()
+            onPrepared?.invoke(w, h)
+        }
     }
 
     /**
-     * Set the video file path.
-     * Call this from Activity after user chooses / sets file.
+     * Prepare video; when ready, onPrepared callback will be invoked.
      */
-    fun setVideoPath(path: String) {
-        videoPath = path
-        // If surface already created, we can start render now
-        if (surfaceReady) {
-            startRenderThread()
+    fun prepare(path: String) {
+        prepared = false
+        isPlaying = false
+        videoWidth = 0
+        videoHeight = 0
+        videoPlayer.prepareAsync(path)
+    }
+
+    /** Caller explicitly starts playback after onPrepared. */
+    fun play() {
+        if (isPlaying) return
+        if (!prepared) {
+            ToastUtils.showShort("Video not prepared yet")
+            return
         }
+        if (!surfaceReady) {
+            ToastUtils.showShort("Surface not ready")
+            return
+        }
+
+        isPlaying = true
+        startRenderThread()
+    }
+
+    /** Stop render loop but keep decoder and buffered frames. */
+    fun pause() {
+        isPlaying = false
+        stopRenderThread()
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         surfaceReady = true
-        startRenderThread()
+        // If user already called play() after prepared, we can start now
+        if (prepared && isPlaying && renderThread == null) {
+            startRenderThread()
+        }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -66,97 +110,97 @@ class SimpleVideoView @JvmOverloads constructor(
         format: Int,
         width: Int,
         height: Int
-    ) {
-        // not used in this simple demo
-    }
+    ) = Unit
 
     private fun startRenderThread() {
-        val path = videoPath ?: return
         if (renderThread != null) return
+        if (!surfaceReady || !prepared) return
+
+        val w = videoWidth
+        val h = videoHeight
+        if (w <= 0 || h <= 0) {
+            ToastUtils.showShort("Invalid video size")
+            return
+        }
 
         running = true
-
-        renderThread = Thread {
-            renderLoop(path)
-        }.apply { start() }
+        renderThread = Thread { renderLoop(w, h) }.apply { start() }
     }
 
     private fun stopRenderThread() {
         running = false
         renderThread?.join()
         renderThread = null
-        videoPlayer.nativeCloseVideo()
     }
 
-    private fun renderLoop(path: String) {
-        // 1. Open video
-        if (!videoPlayer.nativeOpenVideo(path)) {
-            ToastUtils.showShort("Failed to open video: $path")
-            return
-        }
+    fun release() {
+        pause()
+        videoPlayer.release()
+    }
 
-        val w = videoPlayer.nativeGetWidth()
-        val h = videoPlayer.nativeGetHeight()
-        if (w <= 0 || h <= 0) {
-            ToastUtils.showShort("Invalid video size: $w x $h")
-            return
-        }
-
+    private fun renderLoop(w: Int, h: Int) {
         val frameSizeBytes = w * h * 4
         val buffer = ByteBuffer.allocateDirect(frameSizeBytes)
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-
         val srcRect = Rect(0, 0, w, h)
         var dstRect: Rect
 
-        while (running && surfaceReady) {
+        while (running && surfaceReady && isPlaying) {
             buffer.clear()
-            val bytes = videoPlayer.nativeDecodeToRgba(buffer)
-            if (bytes <= 0) {
-                // 0: EOF, <0: error – just stop for demo
-                break
-            }
+            val status = videoPlayer.nativeDecodeToRgba(buffer)
 
-            // Copy RGBA buffer into Bitmap
-            buffer.position(0)
-            bitmap.copyPixelsFromBuffer(buffer)
+            when (status) {
+                MediaStatus.EOF -> {
+                    // No more frames
+                    break
+                }
+                MediaStatus.BUFFERING -> {
+                    // Decoder still running but queue empty – wait a bit
+                    try {
+                        Thread.sleep(10)
+                    } catch (_: InterruptedException) {}
+                    continue
+                }
+                MediaStatus.ERROR -> {
+                    // Error – break playback
+                    break
+                }
+                else -> {
+                    // status > 0: bytes written
+                    buffer.position(0)
+                    bitmap.copyPixelsFromBuffer(buffer)
 
-            // Draw to Surface
-            val canvas: Canvas? = holder.lockCanvas()
-            if (canvas != null) {
-                try {
-                    // Letterbox: center video in view
-                    val viewW = width
-                    val viewH = height
-                    val viewRatio = viewW.toFloat() / viewH
-                    val videoRatio = w.toFloat() / h
+                    val canvas: Canvas? = holder.lockCanvas()
+                    if (canvas != null) {
+                        try {
+                            val viewW = width
+                            val viewH = height
+                            val viewRatio = viewW.toFloat() / viewH
+                            val videoRatio = w.toFloat() / h
 
-                    dstRect = if (videoRatio > viewRatio) {
-                        // limited by width
-                        val scaledH = (viewW / videoRatio).toInt()
-                        val top = (viewH - scaledH) / 2
-                        Rect(0, top, viewW, top + scaledH)
-                    } else {
-                        // limited by height
-                        val scaledW = (viewH * videoRatio).toInt()
-                        val left = (viewW - scaledW) / 2
-                        Rect(left, 0, left + scaledW, viewH)
+                            dstRect = if (videoRatio > viewRatio) {
+                                val scaledH = (viewW / videoRatio).toInt()
+                                val top = (viewH - scaledH) / 2
+                                Rect(0, top, viewW, top + scaledH)
+                            } else {
+                                val scaledW = (viewH * videoRatio).toInt()
+                                val left = (viewW - scaledW) / 2
+                                Rect(left, 0, left + scaledW, viewH)
+                            }
+
+                            canvas.drawColor(0xFF000000.toInt())
+                            canvas.drawBitmap(bitmap, srcRect, dstRect, null)
+                        } finally {
+                            holder.unlockCanvasAndPost(canvas)
+                        }
                     }
 
-                    canvas.drawColor(0xFF000000.toInt()) // clear black
-                    canvas.drawBitmap(bitmap, srcRect, dstRect, null)
-                } finally {
-                    holder.unlockCanvasAndPost(canvas)
+                    // TODO: later replace this with PTS-based timing
+                    try {
+                        Thread.sleep(33) // ~30fps
+                    } catch (_: InterruptedException) {}
                 }
             }
-
-            // For now, simple sleep to slow down. Later we use real PTS.
-            try {
-                Thread.sleep(33) // ~30 FPS
-            } catch (_: InterruptedException) {
-            }
         }
-
-        videoPlayer.nativeCloseVideo()
     }
 }

@@ -1,4 +1,4 @@
-package com.audio.study.ffmpegdecoder
+package com.audio.study.ffmpegdecoder.common
 
 /**
  * @author xinggen.guo

@@ -2,20 +2,12 @@ package com.audio.study.ffmpegdecoder
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.util.Log
-import android.util.TimeUtils
-import android.view.DragEvent
-import android.view.View
-import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
-import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
-import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
+import com.audio.study.ffmpegdecoder.common.Constants
 import com.audio.study.ffmpegdecoder.databinding.ActivityMainBinding
 import com.audio.study.ffmpegdecoder.utils.FileUtil
 import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
-import com.audio.study.ffmpegdecoder.utils.formatSecond
 import java.io.File
 
 class MainActivity : AppCompatActivity() {

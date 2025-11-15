@@ -7,20 +7,34 @@
 	tools:context=".VideoPlayerActivity">
 	
 	<Button
-		android:id="@+id/btnOpenVideo"
+		android:id="@+id/btnPrepare"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:text="Open Play Video"
+		android:text="Prepare"
 		app:layout_constraintEnd_toEndOf="parent"
 		app:layout_constraintStart_toStartOf="parent"
-		app:layout_constraintTop_toTopOf="parent"
-		/>
+		app:layout_constraintTop_toTopOf="parent" />
+	
+	<Button
+		android:id="@+id/btnPlay"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="Play"
+		android:enabled="false"
+		app:layout_constraintTop_toBottomOf="@id/btnPrepare" />
+	
+	<Button
+		android:id="@+id/btnPause"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:text="Pause"
+		app:layout_constraintTop_toBottomOf="@id/btnPlay" />
 	
 	<com.audio.study.ffmpegdecoder.views.SimpleVideoView
 		android:id="@+id/simpleVideoView"
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
-		app:layout_constraintTop_toBottomOf="@id/btnOpenVideo" />
+		app:layout_constraintTop_toBottomOf="@id/btnPause" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

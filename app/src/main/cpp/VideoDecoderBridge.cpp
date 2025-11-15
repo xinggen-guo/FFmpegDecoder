@@ -1,71 +1,133 @@
 //
-// Created by guoxinggen on 2022/6/21.
+// Created by guoxinggen on 2025/11/15.
 //
 
 #include <jni.h>
-#include "video_decoder.h"
+#include <cstring>  // for memcpy
 
-static VideoDecoder* gVideoDecoder = nullptr;
+#include "video_decoder_controller.h"  // <-- new controller
+#include "video_frame.h"               // <-- VideoFrame struct
+#include "media_status.h"
+
+// Single global controller for this demo.
+// If you later want multiple players, you can store pointer in Java field.
+static VideoDecoderController* gVideoController = nullptr;
 
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeOpenVideo(
-        JNIEnv* env, jobject thiz, jstring path_) {
+        JNIEnv* env, jobject /*thiz*/, jstring path_) {
 
     const char* path = env->GetStringUTFChars(path_, nullptr);
     if (!path) return JNI_FALSE;
 
-    if (gVideoDecoder) {
-        delete gVideoDecoder;
-        gVideoDecoder = nullptr;
+    // If already have a controller, destroy it first
+    if (gVideoController) {
+        gVideoController->destroy();
+        delete gVideoController;
+        gVideoController = nullptr;
     }
-    gVideoDecoder = new VideoDecoder();
-    int ret = gVideoDecoder->open(path);
+
+    gVideoController = new VideoDecoderController();
+    int ret = gVideoController->init(path);
 
     env->ReleaseStringUTFChars(path_, path);
-    return (ret == 0) ? JNI_TRUE : JNI_FALSE;
+
+    if (ret != 0) {
+        delete gVideoController;
+        gVideoController = nullptr;
+        return JNI_FALSE;
+    }
+    return JNI_TRUE;
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeCloseVideo(
-        JNIEnv* env, jobject thiz) {
-    if (gVideoDecoder) {
-        delete gVideoDecoder;
-        gVideoDecoder = nullptr;
+        JNIEnv* /*env*/, jobject /*thiz*/) {
+    if (gVideoController) {
+        gVideoController->destroy();
+        delete gVideoController;
+        gVideoController = nullptr;
     }
 }
 
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeGetWidth(
-        JNIEnv* env, jobject thiz) {
-    return gVideoDecoder ? gVideoDecoder->getWidth() : 0;
+        JNIEnv* /*env*/, jobject /*thiz*/) {
+    if (!gVideoController) return 0;
+    return gVideoController->getWidth();
 }
 
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeGetHeight(
-        JNIEnv* env, jobject thiz) {
-    return gVideoDecoder ? gVideoDecoder->getHeight() : 0;
+        JNIEnv* /*env*/, jobject /*thiz*/) {
+    if (!gVideoController) return 0;
+    return gVideoController->getHeight();
 }
 
+/**
+ * Decode one frame from the controller's queue and copy RGBA into Java DirectByteBuffer.
+ *
+ * @param byteBuffer DirectByteBuffer with capacity >= width * height * 4
+ * @return
+ *   >0: bytes written (frameSize)
+ *    0: EOF (no more frames)
+ *   -2: no frame available yet (buffering)
+ *   <0: other error
+ */
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeDecodeToRgba(
-        JNIEnv* env, jobject thiz, jobject byteBuffer) {
+        JNIEnv* env, jobject /*thiz*/, jobject byteBuffer) {
 
-    if (!gVideoDecoder || !byteBuffer) return -1;
+    if (!gVideoController || !byteBuffer) return -1;
 
-    uint8_t* dst = (uint8_t*) env->GetDirectBufferAddress(byteBuffer);
+    // Get native pointer and capacity from DirectByteBuffer
+    uint8_t* dst = static_cast<uint8_t*>(env->GetDirectBufferAddress(byteBuffer));
     jlong cap = env->GetDirectBufferCapacity(byteBuffer);
     if (!dst || cap <= 0) return -1;
 
-    int ret = gVideoDecoder->decodeFrame();
-    if (ret <= 0) {
-        return ret; // 0 EOF, <0 error
+    VideoFrame* frame = nullptr;
+    int ret = gVideoController->getFrame(frame);
+
+    if (ret == MEDIA_STATUS_EOF) {
+        // EOF: no more frames; nothing to copy
+        return MEDIA_STATUS_EOF;
+    } else if (ret == MEDIA_STATUS_BUFFERING) {
+        // Buffering: no frame yet, but not EOF
+        return MEDIA_STATUS_BUFFERING;
+    } else if (ret < MEDIA_STATUS_EOF) {
+        // Other error
+        if (frame) {
+            VideoDecoderController::freeFrame(frame);
+        }
+        return ret;
     }
 
-    int written = gVideoDecoder->toRGBA(dst, (int)cap);
-    return written; // bytes
+    // ret == 1: we have a valid frame
+    if (!frame || !frame->data || frame->dataSize <= 0) {
+        if (frame) {
+            VideoDecoderController::freeFrame(frame);
+        }
+        return MEDIA_STATUS_ERROR;
+    }
+
+    // Ensure buffer is big enough
+    if (cap < frame->dataSize) {
+        // Java buffer too small: this is a usage/config error
+        VideoDecoderController::freeFrame(frame);
+        return MEDIA_STATUS_ERROR;
+    }
+
+    // Copy RGBA data into Java ByteBuffer
+    std::memcpy(dst, frame->data, static_cast<size_t>(frame->dataSize));
+    int written = frame->dataSize;
+
+    // Free frame back on native side
+    VideoDecoderController::freeFrame(frame);
+
+    return written;
 }
