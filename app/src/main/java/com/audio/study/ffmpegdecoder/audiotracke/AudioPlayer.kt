@@ -7,7 +7,7 @@ import com.audio.study.ffmpegdecoder.utils.LogUtil
 import java.lang.IllegalArgumentException
 import java.lang.NullPointerException
 
-class NativePlayer {
+class AudioPlayer {
 
     companion object{
         const val TAG = "NativePlayer"
@@ -21,7 +21,7 @@ class NativePlayer {
     private var audioDefaultFormat = AudioFormat.ENCODING_PCM_16BIT
     private var audioDefaultChannel = AudioFormat.CHANNEL_OUT_STEREO
 
-    private var duration = 0
+    private var duration = 0L
 
     private var decoderBufferSize = 0
     private var isPlaying = false
@@ -70,7 +70,7 @@ class NativePlayer {
             if(decoderBufferSize  <= 0){
                 throw IllegalArgumentException("decoderBufferSize < 0")
             }
-            duration = metaArray[2]
+            duration = metaArray[2].toLong()
             LogUtil.i("sampleRateInHz:${sampleRateInHz}---->decoderBufferSize:${decoderBufferSize}")
             return true
         }
@@ -92,7 +92,7 @@ class NativePlayer {
     }
 
     fun play() {
-        synchronized(NativePlayer::class.java) {
+        synchronized(AudioPlayer::class.java) {
             try {
                 audioTrack?.play()
             } catch (t: Throwable) {
@@ -113,7 +113,7 @@ class NativePlayer {
     }
 
     fun stop() {
-        synchronized(NativePlayer::class.java) {
+        synchronized(AudioPlayer::class.java) {
             try {
                 audioTrack?.stop()
             } catch (t: Throwable) {
@@ -123,12 +123,12 @@ class NativePlayer {
         }
     }
 
-    fun getDuration(): Int {
+    fun getDuration(): Long {
         return duration
     }
 
-    fun getProgress(): Int {
-        return audioDecoder?.getProgress() ?: 0
+    fun getProgress(): Long {
+        return audioDecoder?.getProgress() ?: 0L
     }
 
     fun destroy() {
@@ -164,7 +164,7 @@ class NativePlayer {
                         break
                     }
                     while (true) {
-                        synchronized(NativePlayer::class.java) {
+                        synchronized(AudioPlayer::class.java) {
                             isPlayTemp = isPlaying
                         }
                         if (isPlayTemp)

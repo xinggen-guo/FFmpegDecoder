@@ -39,7 +39,7 @@ int AudioDecoder::initAudioDecoder(const char *string) {
         return -1;
     }
 
-    AVStream *audioStream = avFormatContext->streams[audioIndex];
+    audioStream = avFormatContext->streams[audioIndex];
 
     time_base = av_q2d(audioStream->time_base);
     avCodecContext = audioStream->codec;
@@ -52,12 +52,14 @@ int AudioDecoder::initAudioDecoder(const char *string) {
         return -1;
     }
 
+    channels = avCodecContext->channels;
     sampleRate = avCodecContext->sample_rate;
     int bufferSize = sampleRate * CHANNEL_PER_FRAME
                                    * BITS_PER_CHANNEL / BITS_PER_BYTE;
     packetBufferSize = bufferSize / 2 * 0.2;
 
-    duration = avFormatContext->duration / AV_TIME_BASE;
+    int64_t durationUs = avFormatContext->duration;
+    duration = static_cast<int>(durationUs / 1000);
 
     LOGI("initAudioDecoder---->sampleRate:%1d---->packetBufferSize:%2d---->frame_size:%3d--->duration:%4d", sampleRate, packetBufferSize, avCodecContext->frame_size,duration);
     //判断需不需要重采样
@@ -82,7 +84,11 @@ int AudioDecoder::getSampleRate() {
     return sampleRate;
 }
 
-int AudioDecoder::getDuration() {
+int AudioDecoder::getChannels() {
+    return channels;
+}
+
+int64_t AudioDecoder::getDuration() {
     return duration;
 }
 
@@ -180,12 +186,35 @@ int AudioDecoder::readFrame() {
 
 void AudioDecoder::seekFrame() {
     LOGI("seekFrame--start");
-    if(time_seek > 0){
-        int64_t seek_pos = time_seek / time_base;
-        if (av_seek_frame(avFormatContext, audioIndex, seek_pos, AVSEEK_FLAG_BACKWARD) < 0) {
-            LOGI("seekFrame-- failed!---time_position:%1f", (double) seek_pos/1000);
+
+    if (time_seek >= 0 && audioStream != nullptr) {
+        // time_seek: milliseconds
+        // We convert ms → stream time_base
+        AVRational srcTimeBase = {1, 1000};                 // ms
+        AVRational dstTimeBase = audioStream->time_base;    // stream time_base
+
+        int64_t seek_pts = av_rescale_q(time_seek, srcTimeBase, dstTimeBase);
+
+        int ret = av_seek_frame(avFormatContext,
+                                audioIndex,
+                                seek_pts,
+                                AVSEEK_FLAG_BACKWARD);
+
+        if (ret < 0) {
+            LOGI("seekFrame-- failed! time_position=%f s", (double) time_seek / 1000.0);
+        } else {
+            LOGI("seekFrame-- success, time_position=%f s", (double) time_seek / 1000.0);
         }
+
+        // After seek, flush decoder buffers
+        if (avCodecContext) {
+            avcodec_flush_buffers(avCodecContext);
+        }
+
+        // Clear the pending seek
+        time_seek = -1;
     }
+
     LOGI("seekFrame--end");
 }
 
@@ -197,25 +226,19 @@ bool AudioDecoder::audioCodecIsSupported() {
 }
 
 void AudioDecoder::destroy() {
-    if(NULL != swrContext) {
-        swr_close(swrContext);
-        swr_free(&swrContext);
-        swrContext = NULL;
-    }
-    if (NULL != avPacket) {
-        av_packet_free(&avPacket);
-        avPacket = NULL;
-    }
-    if (NULL != avFrame) {
-        av_frame_free(&avFrame);
-        avFrame = NULL;
-    }
-    if(NULL != avCodecContext) {
+    if (avCodecContext) {
         avcodec_close(avCodecContext);
-        avCodecContext = NULL;
+        avCodecContext = nullptr;
     }
-    if(NULL != avFormatContext) {
-        avformat_close_input(&avFormatContext);
-        avFormatContext = NULL;
+    if (avFormatContext) {
+        avformat_close_input(&avFormatContext);  // frees streams internally
+        avFormatContext = nullptr;
     }
+    // DO NOT free audioStream manually
+    audioStream = nullptr;
+
+    // Clear other pointers
+    swrContext = nullptr;
+    avPacket = nullptr;
+    avFrame = nullptr;
 }

@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
         binding.videoSample.setOnClickListener {
             startActivity(Intent(this, VideoPlayerActivity::class.java))
         }
+        binding.videoAudioSyncSample.setOnClickListener {
+            startActivity(Intent(this, AudioVideoSyncActivity::class.java))
+        }
     }
 
     /**

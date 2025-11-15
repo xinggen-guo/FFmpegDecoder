@@ -5,7 +5,7 @@
 #include <CommonTools.h>
 #include "audio_decoder_controller.h"
 #include "audio_visualizer.h"
-#include "media_status.h"
+#include "MediaStatus.h"
 
 int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) {
     int result = 0;
@@ -36,14 +36,14 @@ void AudioDecoderController::seek(const long seek_time) {
     seekTime = seek_time;
 
     //Immediately update “public” time so UI gets the new value
-    progress = static_cast<int>(seek_time);
+    progress = seekTime;
 
     // wake decode thread to apply the real seek
     pthread_cond_signal(&mCondition);
     pthread_mutex_unlock(&mLock);
 }
 
-int AudioDecoderController::getProgress() {
+int64_t AudioDecoderController::getProgress() {
     return progress;
 }
 
@@ -65,7 +65,10 @@ int AudioDecoderController::readSamples(short *samples, int size) {
         } else {
             short *dataSamples = audioPacket->audioBuffer;
             memcpy(samples, dataSamples, audioPacket->audioSize * 2);
-            progress = audioPacket->startPosition;
+            if (audioDecoder->getSampleRate() > 0) {
+                int packetMs = (audioPacket->audioSize / audioDecoder->getChannels()) * 1000 / audioDecoder->getSampleRate();
+                progress += packetMs;
+            }
             audioFrameQueue.pop();
             result = audioPacket->audioSize;
 
@@ -119,7 +122,7 @@ void *AudioDecoderController::startDecoderThread(void *ptr) {
     int getLockCode = pthread_mutex_lock(&decoderController->mLock);
     while (decoderController->isRunning) {
         if (decoderController->needSeek) {
-            if (decoderController->seekTime > 0) {
+            if (decoderController->seekTime >= 0) {
                 int dataSize = decoderController->audioFrameQueue.size();
                 if (dataSize > 0) {
                     for (int i = 0; i < dataSize; i++) {
@@ -129,7 +132,7 @@ void *AudioDecoderController::startDecoderThread(void *ptr) {
                     }
                 }
                 decoderController->audioDecoder->seek(decoderController->seekTime);
-                decoderController->seekTime = 0;
+                decoderController->seekTime = -1;
             }
         }
         int result = decoderController->decodeSongPacket();

@@ -7,7 +7,7 @@
 
 #include "video_decoder_controller.h"  // <-- new controller
 #include "video_frame.h"               // <-- VideoFrame struct
-#include "media_status.h"
+#include "MediaStatus.h"
 
 // Single global controller for this demo.
 // If you later want multiple players, you can store pointer in Java field.
@@ -127,6 +127,59 @@ Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeDecodeToRgba(
     int written = frame->dataSize;
 
     // Free frame back on native side
+    VideoDecoderController::freeFrame(frame);
+
+    return written;
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeDecodeToRgbaWithPts(
+        JNIEnv* env, jobject /*thiz*/, jobject byteBuffer, jlongArray ptsOutMs) {
+
+    if (!gVideoController || !byteBuffer || !ptsOutMs) return -1;
+
+    uint8_t* dst = static_cast<uint8_t*>(env->GetDirectBufferAddress(byteBuffer));
+    jlong cap = env->GetDirectBufferCapacity(byteBuffer);
+    if (!dst || cap <= 0) return -1;
+
+    VideoFrame* frame = nullptr;
+    int ret = gVideoController->getFrame(frame);
+
+    if (ret == MEDIA_STATUS_EOF) {
+        // EOF
+        return MEDIA_STATUS_EOF;
+    } else if (ret == MEDIA_STATUS_BUFFERING) {
+        // BUFFERING (you mapped -2 → 2 already)
+        return MEDIA_STATUS_BUFFERING;
+    } else if (ret < MEDIA_STATUS_EOF) {
+        if (frame) {
+            VideoDecoderController::freeFrame(frame);
+        }
+        return MEDIA_STATUS_ERROR; // ERROR
+    }
+
+    // ret == 1: got a frame
+    if (!frame || !frame->data || frame->dataSize <= 0) {
+        if (frame) {
+            VideoDecoderController::freeFrame(frame);
+        }
+        return MEDIA_STATUS_ERROR;
+    }
+
+    if (cap < frame->dataSize) {
+        VideoDecoderController::freeFrame(frame);
+        return MEDIA_STATUS_ERROR;
+    }
+
+    // copy RGBA
+    std::memcpy(dst, frame->data, static_cast<size_t>(frame->dataSize));
+
+    // write PTS to ptsOutMs[0]
+    jlong pts = static_cast<jlong>(frame->ptsMs); // ptsMs is double, but ms fits in long
+    env->SetLongArrayRegion(ptsOutMs, 0, 1, &pts);
+
+    int written = frame->dataSize;
     VideoDecoderController::freeFrame(frame);
 
     return written;

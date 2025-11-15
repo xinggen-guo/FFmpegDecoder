@@ -50,11 +50,13 @@ private:
     AVPacket *avPacket;
     AVFrame *avFrame;
     SwrContext *swrContext;
+    AVStream* audioStream = nullptr;
 
     int audioIndex = AVERROR_STREAM_NOT_FOUND;
     int sampleRate;
+    int channels;
     int packetBufferSize;
-    int duration;
+    int64_t duration;
     float time_base;
 
     /** 解码数据 **/
@@ -66,7 +68,7 @@ private:
 
     /** seek **/
     bool need_seek = false;
-    long time_seek;
+    int64_t time_seek = -1;
 
 public:
     int initAudioDecoder(const char *string);
@@ -76,8 +78,9 @@ public:
     PcmFrame* decoderAudioPacket();
     int readSampleData(short *pInt, int size);
     int readFrame();
-    int getDuration();
+    int64_t getDuration();
     int getSampleRate();
+    int getChannels();
     int getPacketBufferSize();
     void seek(const long seek_time);
     void seekFrame();

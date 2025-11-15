@@ -14,6 +14,6 @@ interface AudioDecoder {
 
     fun seek(seekPosition: Long)
 
-    fun getProgress(): Int?
+    fun getProgress(): Long?
 
 }

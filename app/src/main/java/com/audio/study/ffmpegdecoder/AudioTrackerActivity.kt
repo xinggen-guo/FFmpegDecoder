@@ -5,11 +5,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.audiotracke.NativePlayController
-import com.audio.study.ffmpegdecoder.audiotracke.NativePlayer
+import com.audio.study.ffmpegdecoder.audiotracke.AudioPlayer
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioTrackeBinding
 import com.audio.study.ffmpegdecoder.utils.FileUtil
-import com.audio.study.ffmpegdecoder.utils.formatSecond
-import java.io.File
+import com.audio.study.ffmpegdecoder.utils.formatMillisecond
 
 class AudioTrackerActivity : AppCompatActivity() {
 
@@ -28,11 +27,11 @@ class AudioTrackerActivity : AppCompatActivity() {
 
         binding.audioTrackPrepare.setOnClickListener {
             nativePlayController = NativePlayController()
-            nativePlayController?.setPlayListener(object : NativePlayer.OnPlayListener {
+            nativePlayController?.setPlayListener(object : AudioPlayer.OnPlayListener {
                 override fun onReady() {
                     val duration = nativePlayController?.getDuration() ?: 0
-                    binding.audioProgress.max = duration
-                    binding.duration.text = formatSecond(duration.toLong())
+                    binding.audioProgress.max = duration.toInt()
+                    binding.duration.text = formatMillisecond(duration)
                 }
 
                 override fun onPlayComplete() {
@@ -61,11 +60,11 @@ class AudioTrackerActivity : AppCompatActivity() {
         binding.audioProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
 
             var isSeek = false
-            var pendingProgress = 0
+            var pendingProgress = 0L
 
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (isSeek && fromUser) {
-                    pendingProgress = progress
+                    pendingProgress = progress.toLong()
                 }
             }
 
@@ -92,8 +91,8 @@ class AudioTrackerActivity : AppCompatActivity() {
     private fun startUpdateAudioProgress() {
         handler.postDelayed({
             val progress = nativePlayController?.getProgress() ?: 0
-            binding.progress.text = formatSecond(progress.toLong())
-            binding.audioProgress.progress = progress
+            binding.progress.text = formatMillisecond(progress)
+            binding.audioProgress.progress = progress.toInt()
             startUpdateAudioProgress()
         }, 50)
     }

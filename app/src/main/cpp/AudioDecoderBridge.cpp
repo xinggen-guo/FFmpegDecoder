@@ -58,9 +58,9 @@ Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_nativeSeekPlay(J
 }
 
 extern "C"
-JNIEXPORT jint JNICALL
+JNIEXPORT jlong JNICALL
 Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_nativeGetProgress(JNIEnv *env, jobject thiz) {
     if(NULL != audioDecoderController){
-        return audioDecoderController->getProgress();
+        return (jlong)(audioDecoderController->getProgress());
     }
 }

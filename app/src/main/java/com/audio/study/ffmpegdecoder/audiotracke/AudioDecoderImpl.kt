@@ -22,7 +22,7 @@ class AudioDecoderImpl : AudioDecoder {
         prepareDecoder(musicPath)
     }
 
-    override fun getProgress(): Int {
+    override fun getProgress(): Long {
         return nativeGetProgress()
     }
 
@@ -30,7 +30,7 @@ class AudioDecoderImpl : AudioDecoder {
         nativeSeekPlay(seekPosition)
     }
 
-    private external fun nativeGetProgress(): Int
+    private external fun nativeGetProgress(): Long
 
     private external fun getMusicMeta(musicPath: String, metaArray: IntArray): Boolean
 

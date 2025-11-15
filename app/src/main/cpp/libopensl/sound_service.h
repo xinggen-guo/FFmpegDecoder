@@ -31,7 +31,7 @@ private:
     short*   mTarget = nullptr;
 
     // 解码器元数据
-    int duration = 0;
+    long duration = 0;
 
 	//解码Mp3的解码的controller
 	AudioDecoderController* decoderController = nullptr;
@@ -230,7 +230,7 @@ public:
 
 	void producePacket();
 	bool isPlaying();
-	int getCurrentTimeMills();
+    int64_t getCurrentTimeMills();
 
 	/**
 	 * Destroy the player context.

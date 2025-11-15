@@ -16,7 +16,6 @@ import java.io.File
 class VideoPlayerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityVideoPlayerBinding
-
     // For demo, we just use a hardcoded path.
     // You should replace this with your actual file path selector.
     val demoVideoPath by lazy { FileUtil.getTheVideoPath(this) }

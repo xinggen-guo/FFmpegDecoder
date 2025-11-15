@@ -22,6 +22,8 @@ class VideoPlayer {
     external fun nativeGetHeight(): Int
     external fun nativeDecodeToRgba(buffer: ByteBuffer): Int
 
+    external fun nativeDecodeToRgbaWithPts(buffer: ByteBuffer, ptsOutMs: LongArray): Int
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /** Called when prepare finished (decoder opened, width/height known). */

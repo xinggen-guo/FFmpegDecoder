@@ -2,9 +2,9 @@ package com.audio.study.ffmpegdecoder.audiotracke
 
 class NativePlayController {
 
-    var nativePlayer = NativePlayer()
+    var nativePlayer = AudioPlayer()
 
-    fun setPlayListener(playListener: NativePlayer.OnPlayListener){
+    fun setPlayListener(playListener: AudioPlayer.OnPlayListener){
         nativePlayer.setPlayListener(playListener)
     }
 
@@ -28,11 +28,11 @@ class NativePlayController {
         nativePlayer.stop()
     }
 
-    fun getDuration(): Int {
+    fun getDuration(): Long {
         return nativePlayer.getDuration()
     }
 
-    fun getProgress(): Int {
+    fun getProgress(): Long {
         return nativePlayer.getProgress()
     }
 
@@ -40,8 +40,8 @@ class NativePlayController {
         nativePlayer.resume()
     }
 
-    fun seek(progress: Int) {
-        nativePlayer.seek(progress.toLong())
+    fun seek(progress: Long) {
+        nativePlayer.seek(progress)
     }
 
 }

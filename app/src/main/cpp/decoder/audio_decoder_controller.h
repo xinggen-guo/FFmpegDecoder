@@ -24,8 +24,8 @@ private:
     bool isRunning;
     pthread_mutex_t mLock;
     pthread_cond_t mCondition;
-    int progress;
-    long seekTime;
+    int64_t progress;
+    int64_t seekTime = -1;
     bool needSeek;
 
     static void *startDecoderThread(void *ptr);
@@ -49,7 +49,7 @@ public:
 
     void seek(const long seek_time);
 
-    int getProgress();
+    int64_t getProgress();
 
     AudioDecoderController() {
         needSeek = false;

@@ -3,7 +3,7 @@
 //
 
 #include "video_decoder_controller.h"
-#include "media_status.h"
+#include "MediaStatus.h"
 #include <cstring>
 
 VideoDecoderController::VideoDecoderController() {

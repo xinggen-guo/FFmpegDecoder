@@ -170,7 +170,7 @@ bool SoundService::initSongDecoder(const char* accompanyPath) {
     mPacketBufferSize   = metaData[1];  // 注意：这里视为“short 的个数”
     duration            = metaData[2];
 
-    LOGI("meta: sampleRate=%d, packetBufferSize(samples)=%d, duration=%d",
+    LOGI("meta: sampleRate=%d, packetBufferSize(samples)=%d, duration=%ld",
          accompanySampleRate, mPacketBufferSize, duration);
 
     // 分配一个 packet 的 short 缓冲，用于 readSamples
@@ -371,7 +371,7 @@ SLresult SoundService::initSoundTrack() {
 	return SL_RESULT_SUCCESS;
 }
 
-int SoundService::getCurrentTimeMills() {
+int64_t SoundService::getCurrentTimeMills() {
 	return decoderController->getProgress();
 }
 

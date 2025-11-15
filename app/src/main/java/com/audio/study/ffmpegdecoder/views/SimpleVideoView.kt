@@ -145,28 +145,61 @@ class SimpleVideoView @JvmOverloads constructor(
         val srcRect = Rect(0, 0, w, h)
         var dstRect: Rect
 
+        // For PTS scheduling
+        val ptsOut = LongArray(1)
+        var firstPtsMs: Long = -1L
+        var startPlaybackTimeMs: Long = -1L
+
+        // optional: how much lateness we tolerate before dropping frames
+        val maxLateMs = 80L
+
         while (running && surfaceReady && isPlaying) {
             buffer.clear()
-            val status = videoPlayer.nativeDecodeToRgba(buffer)
+            ptsOut[0] = 0L
+
+            val status = videoPlayer.nativeDecodeToRgbaWithPts(buffer, ptsOut)
+            val ptsMs = ptsOut[0]
 
             when (status) {
                 MediaStatus.EOF -> {
-                    // No more frames
+                    // no more frames
                     break
                 }
                 MediaStatus.BUFFERING -> {
-                    // Decoder still running but queue empty – wait a bit
                     try {
                         Thread.sleep(10)
                     } catch (_: InterruptedException) {}
                     continue
                 }
                 MediaStatus.ERROR -> {
-                    // Error – break playback
+                    // error
                     break
                 }
                 else -> {
-                    // status > 0: bytes written
+                    // status > 0: we have a valid frame
+                    if (firstPtsMs < 0) {
+                        // First frame: establish timeline
+                        firstPtsMs = ptsMs
+                        startPlaybackTimeMs = android.os.SystemClock.elapsedRealtime()
+                    }
+
+                    // target wall-clock time for this frame
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val elapsedSinceStart = now - startPlaybackTimeMs
+                    val frameRelativeMs = ptsMs - firstPtsMs
+                    val delayMs = frameRelativeMs - elapsedSinceStart
+
+                    if (delayMs > 1) {
+                        // frame is early – wait a bit
+                        try {
+                            Thread.sleep(delayMs.coerceAtMost(50L))
+                        } catch (_: InterruptedException) {}
+                    } else if (delayMs < -maxLateMs) {
+                        // frame is too late, drop it (skip drawing)
+                        continue
+                    }
+
+                    // Now draw
                     buffer.position(0)
                     bitmap.copyPixelsFromBuffer(buffer)
 
@@ -194,11 +227,6 @@ class SimpleVideoView @JvmOverloads constructor(
                             holder.unlockCanvasAndPost(canvas)
                         }
                     }
-
-                    // TODO: later replace this with PTS-based timing
-                    try {
-                        Thread.sleep(33) // ~30fps
-                    } catch (_: InterruptedException) {}
                 }
             }
         }

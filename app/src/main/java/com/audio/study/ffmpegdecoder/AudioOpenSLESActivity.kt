@@ -5,126 +5,97 @@ import android.os.Bundle
 import android.os.Handler
 import android.widget.SeekBar
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioOpenSlesactivityBinding
-import com.audio.study.ffmpegdecoder.opensles.SoundTrackController
+import com.audio.study.ffmpegdecoder.opensles.OpenSlesAudioPlayer
 import com.audio.study.ffmpegdecoder.utils.FileUtil
-import com.audio.study.ffmpegdecoder.utils.LogUtil
 import com.audio.study.ffmpegdecoder.utils.ToastUtils
-import com.audio.study.ffmpegdecoder.utils.formatSecond
+import com.audio.study.ffmpegdecoder.utils.formatMillisecond
 import java.io.File
-import java.util.concurrent.Delayed
 
 class AudioOpenSLESActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAudioOpenSlesactivityBinding
 
-    val path by lazy { FileUtil.getTheAudioPath(this) }
-    var songTrackController: SoundTrackController? = null
+    private val path by lazy { FileUtil.getTheAudioPath(this) }
+    private val audioPlayer by lazy { OpenSlesAudioPlayer() }
+
+    private val uiHandler = Handler()
 
     private val spectrumSize = 32
     private val spectrum = FloatArray(spectrumSize)
-    private val uiHandler = Handler()
-    private var visualizerRunning = false
 
     private val waveSize = 512
     private val waveArray = FloatArray(waveSize)
 
-    private val visualizerRunnable = object : Runnable {
-        override fun run() {
-            if (!visualizerRunning) return
-            songTrackController?.nativeGetSpectrum(spectrum)
-            binding.visualizerView.updateSpectrum(spectrum) // custom view
-            uiHandler.postDelayed(this, 50) // ~20 FPS
-        }
-    }
-
-    private val waveRunnable = object : Runnable {
-        override fun run() {
-            if (!visualizerRunning) return
-            songTrackController?.nativeGetWaveform(waveArray)
-            binding.visualizerWaveView.updateWaveform(waveArray)
-            uiHandler.postDelayed(this, 16) // ~60 FPS
-        }
-    }
-
-    private var isSeek = false  // same flag, or expose from listener
+    private var visualizerRunning = false
     private var progressJobRunning = false
-    private val progressRunnable = object : Runnable {
-        override fun run() {
-            if (!progressJobRunning) return
-
-            // ⛔️ Don't touch SeekBar while user is dragging
-            if (!isSeek) {
-                val progress = songTrackController?.getProgress() ?: 0
-                binding.progress.text = formatSecond(progress.toLong())
-                binding.audioProgress.progress = progress
-            }
-
-            uiHandler.postDelayed(this, 100)
-        }
-    }
+    private var isSeek = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAudioOpenSlesactivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.openslEsPrepare.setOnClickListener {
-            songTrackController = SoundTrackController()
-            songTrackController?.setOnSoundTrackListener(object : SoundTrackController.OnSoundTrackListener {
-                override fun onCompletion() {
-                    LogUtil.i("onCompletion")
-                    stopProgressUpdate()
-                    if(visualizerRunning){
-                        uiHandler.removeCallbacksAndMessages(null)
-                    }
-                    ToastUtils.showLong("complete")
-                    songTrackController?.stop()
-                }
-
-                override fun onReady() {
-                    val duration = songTrackController?.getDuration() ?: 0
-                    binding.audioProgress.max = duration
-                    binding.duration.text = formatSecond(duration.toLong())
-                }
-            })
-            songTrackController?.apply {
-               this.setAudioDataSource(path,this)
-            }
-            songTrackController?.setVisualizerEnable(binding.openVisualizer.isChecked)
-            visualizerRunning = binding.openVisualizer.isChecked
+        // --- callbacks ---
+        audioPlayer.onPrepared = { durationMs ->
+            binding.audioProgress.max = durationMs.toInt()
+            binding.duration.text = formatMillisecond(durationMs)
         }
 
-        binding.openVisualizer.setOnCheckedChangeListener { compoundButton, b ->
-            songTrackController?.setVisualizerEnable(b)
+        audioPlayer.onCompletion = {
+            stopProgressUpdate()
+            visualizerRunning = false
+            checkOpenVisualizer(false)
+        }
+
+        audioPlayer.onError = { msg ->
+            ToastUtils.showShort(msg)
+        }
+
+        // --- UI wires ---
+        binding.openslEsPrepare.setOnClickListener {
+            if (!File(path).exists()) {
+                ToastUtils.showShort("File not found: $path")
+                return@setOnClickListener
+            }
+            audioPlayer.prepare(path)
             visualizerRunning = binding.openVisualizer.isChecked
-            checkOpenVisualizer(b)
+            audioPlayer.setVisualizerEnable(visualizerRunning)
         }
 
         binding.openslEsStart.setOnClickListener {
-            songTrackController?.play()
+            audioPlayer.play()
             startProgressUpdate()
             checkOpenVisualizer(visualizerRunning)
         }
 
         binding.openslEsPause.setOnClickListener {
+            audioPlayer.pause()
             stopProgressUpdate()
-            songTrackController?.pause()
         }
 
         binding.openslEsResume.setOnClickListener {
-            songTrackController?.resume()
+            audioPlayer.resume()
             startProgressUpdate()
         }
 
         binding.openslEsDestroy.setOnClickListener {
+            audioPlayer.stop()
             stopProgressUpdate()
-            songTrackController?.stop()
+            checkOpenVisualizer(false)
         }
 
-        binding.audioProgress.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
+        binding.openVisualizer.setOnCheckedChangeListener { _, isChecked ->
+            visualizerRunning = isChecked
+            audioPlayer.setVisualizerEnable(isChecked)
+            checkOpenVisualizer(isChecked)
+        }
 
-            var isSeek = false
-            var pendingProgress = 0
+        setupSeekBar()
+    }
+
+    private fun setupSeekBar() {
+        binding.audioProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            private var pendingProgress = 0
 
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (isSeek && fromUser) {
@@ -134,28 +105,30 @@ class AudioOpenSLESActivity : AppCompatActivity() {
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
                 isSeek = true
-                songTrackController?.pause()
+                audioPlayer.pause()
                 stopProgressUpdate()
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                if(isSeek){
-                    songTrackController?.seek(pendingProgress)
-                }
-                songTrackController?.resume()
-                startProgressUpdate()
                 isSeek = false
+                audioPlayer.seek(pendingProgress)
+                audioPlayer.resume()
+                startProgressUpdate()
             }
-
         })
     }
 
-    private fun checkOpenVisualizer(b: Boolean) {
-        if (b) {
-            uiHandler.postDelayed(visualizerRunnable, 50)
-            uiHandler.postDelayed(waveRunnable,16)
-        } else {
-            uiHandler.removeCallbacksAndMessages(null)
+    // --- progress UI ---
+
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            if (!progressJobRunning) return
+            if (!isSeek) {
+                val progress = audioPlayer.getProgress()
+                binding.progress.text = formatMillisecond(progress.toLong())
+                binding.audioProgress.progress = progress
+            }
+            uiHandler.postDelayed(this, 100)
         }
     }
 
@@ -169,13 +142,43 @@ class AudioOpenSLESActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(progressRunnable)
     }
 
+    // --- visualizer ---
+
+    private val visualizerRunnable = object : Runnable {
+        override fun run() {
+            if (!visualizerRunning) return
+            audioPlayer.getSpectrum(spectrum)
+            binding.visualizerView.updateSpectrum(spectrum)
+            uiHandler.postDelayed(this, 50)
+        }
+    }
+
+    private val waveRunnable = object : Runnable {
+        override fun run() {
+            if (!visualizerRunning) return
+            audioPlayer.getWaveform(waveArray)
+            binding.visualizerWaveView.updateWaveform(waveArray)
+            uiHandler.postDelayed(this, 16)
+        }
+    }
+
+    private fun checkOpenVisualizer(enabled: Boolean) {
+        if (enabled) {
+            uiHandler.postDelayed(visualizerRunnable, 50)
+            uiHandler.postDelayed(waveRunnable, 16)
+        } else {
+            uiHandler.removeCallbacks(visualizerRunnable)
+            uiHandler.removeCallbacks(waveRunnable)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        songTrackController?.stop()
+        audioPlayer.stop()
+        stopProgressUpdate()
     }
 
     companion object {
-
         init {
             System.loadLibrary("ffmpegdecoder")
         }

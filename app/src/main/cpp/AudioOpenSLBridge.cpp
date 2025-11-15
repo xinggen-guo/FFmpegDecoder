@@ -79,7 +79,7 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getProgress(JNI
     }
 }
 extern "C"
-JNIEXPORT jint JNICALL
+JNIEXPORT jlong JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getDuration(JNIEnv *env,
                                                                              jobject thiz) {
     if (NULL != soundService) {

@@ -55,5 +55,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/audioOpenGL" />
+    
+    <Button
+        android:id="@+id/videoAudioSyncSample"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="Video Audio Sync Demo"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoSample" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

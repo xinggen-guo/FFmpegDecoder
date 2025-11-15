@@ -52,7 +52,7 @@ class SoundTrackController : NativeOnSoundTrackListener {
     /**
      * 获取文件时长
      */
-    external fun getDuration(): Int
+    external fun getDuration(): Long
 
     override fun onCompletion() {
         LogUtil.i("onCompletion---1111")
@@ -70,16 +70,9 @@ class SoundTrackController : NativeOnSoundTrackListener {
     fun setOnSoundTrackListener(onSoundTrackListener: OnSoundTrackListener?) {
         this.onSoundTrackListener = onSoundTrackListener
     }
-
-
-    interface OnSoundTrackListener {
-        fun onCompletion()
-        fun onReady()
-    }
 }
 
 interface NativeOnSoundTrackListener {
     fun onCompletion()
     fun onReady()
-
 }
