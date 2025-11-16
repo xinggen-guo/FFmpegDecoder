@@ -5,7 +5,6 @@
 #ifndef FFMPEGDECODER_AUDIO_DECODER_H
 #define FFMPEGDECODER_AUDIO_DECODER_H
 
-
 #include "audio_decoder.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,6 +69,8 @@ private:
     bool need_seek = false;
     int64_t time_seek = -1;
 
+    void seekFrame();
+
 public:
     int initAudioDecoder(const char *string);
     bool audioCodecIsSupported();
@@ -83,7 +84,6 @@ public:
     int getChannels();
     int getPacketBufferSize();
     void seek(const long seek_time);
-    void seekFrame();
 };
 
 

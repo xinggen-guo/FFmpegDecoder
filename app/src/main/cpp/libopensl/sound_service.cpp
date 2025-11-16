@@ -374,6 +374,9 @@ SLresult SoundService::initSoundTrack() {
 int64_t SoundService::getCurrentTimeMills() {
 	return decoderController->getProgress();
 }
+int64_t SoundService::getAudioClockMs() {
+    return decoderController->getAudioClockMs();
+}
 
 bool SoundService::isPlaying() {
 	return playingState != PLAYING_STATE_STOPPED;

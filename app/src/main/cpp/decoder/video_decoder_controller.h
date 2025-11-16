@@ -30,9 +30,20 @@ public:
     // After rendering, caller must free frame buffer
     static void freeFrame(VideoFrame* frame);
 
+    void seek(int64_t positionMs);
+
     // For later A/V sync
     int getWidth() const { return width; }
     int getHeight() const { return height; }
+
+    // Play from start or current seek position
+    void play();
+
+    // Resume from pause (do NOT seek or recreate thread)
+    void resume();
+
+    // Pause decode (keep thread alive)
+    void pause();
 
 private:
     static void* decodeThreadEntry(void* arg);
@@ -40,18 +51,24 @@ private:
 
     void pushFrame(VideoFrame* frame);
     VideoFrame* popFrameInternal();
-
+    void clearFrameQueue();
 private:
     VideoDecoder* videoDecoder = nullptr;
 
     pthread_t decodeThread{};
-    bool isRunning = false;
     bool isFinished = false;
 
     // Producer-consumer queue
     std::queue<VideoFrame*> frameQueue;
     pthread_mutex_t queueMutex{};
     pthread_cond_t  queueCond{};
+
+    std::atomic<bool>  needSeek{false};
+    std::atomic<int64_t> pendingSeekMs{0};
+
+    std::atomic<bool> running{false};   // decode thread exists
+    std::atomic<bool> playing{false};   // currently playing (not paused)
+    std::atomic<bool> started{false};   // has play-from-start been called
 
     int width = 0;
     int height = 0;

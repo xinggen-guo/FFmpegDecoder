@@ -4,6 +4,7 @@
 
 #include "video_decoder_controller.h"
 #include "MediaStatus.h"
+#include "CommonTools.h"
 #include <cstring>
 
 VideoDecoderController::VideoDecoderController() {
@@ -31,24 +32,15 @@ int VideoDecoderController::init(const char* path) {
     width = videoDecoder->getWidth();
     height = videoDecoder->getHeight();
 
-    isRunning = true;
+    running = false;
     isFinished = false;
-
-    int createRet = pthread_create(&decodeThread, nullptr, &VideoDecoderController::decodeThreadEntry, this);
-    if (createRet != 0) {
-        isRunning = false;
-        delete videoDecoder;
-        videoDecoder = nullptr;
-        return -1;
-    }
-
     return 0;
 }
 
 void VideoDecoderController::destroy() {
     // 1. stop thread
-    if (isRunning) {
-        isRunning = false;
+    if (running) {
+        running = false;
         pthread_mutex_lock(&queueMutex);
         pthread_cond_broadcast(&queueCond);
         pthread_mutex_unlock(&queueMutex);
@@ -87,18 +79,43 @@ void VideoDecoderController::decodeLoop() {
 
     const int frameSizeBytes = width * height * 4;
 
-    while (isRunning) {
+    while (running) {
 
-        // back-pressure: wait if queue is full
+        // 1) handle pending seek
+        if (needSeek) {
+            int64_t target = pendingSeekMs.load();
+
+            videoDecoder->setSeekPosition(target);
+            videoDecoder->seekFrame();      // av_seek_frame + flush inside
+            clearFrameQueue();              // drop old frames in queue
+
+            // reset EOF state after seek
+            pthread_mutex_lock(&queueMutex);
+            isFinished = false;
+            pthread_mutex_unlock(&queueMutex);
+
+            needSeek = false;
+            continue;
+        }
+
+        // 2) back-pressure + pause handling
         pthread_mutex_lock(&queueMutex);
-        while (isRunning && frameQueue.size() >= QUEUE_MAX_SIZE) {
+        // IMPORTANT: add parentheses to avoid precedence bug
+        while (running &&
+               (frameQueue.size() >= QUEUE_MAX_SIZE || !playing)) {
+            // If queue is full OR we are paused → wait
             pthread_cond_wait(&queueCond, &queueMutex);
         }
         pthread_mutex_unlock(&queueMutex);
 
-        if (!isRunning) break;
+        if (!running) break;
 
-        // 1) decode next frame
+        // If we got resumed / woken while still paused, skip decoding this round
+        if (!playing) {
+            continue;
+        }
+
+        // 3) decode next frame
         int ret = videoDecoder->decodeFrame();
         if (ret <= 0) {
             // EOF or error
@@ -106,22 +123,24 @@ void VideoDecoderController::decodeLoop() {
             // push EOF marker once
             if (!isFinished) {
                 VideoFrame* eofFrame = new VideoFrame();
+                memset(eofFrame, 0, sizeof(VideoFrame)); // safe init
                 eofFrame->eof = true;
                 frameQueue.push(eofFrame);
                 pthread_cond_broadcast(&queueCond);
+                isFinished = true;
             }
-            isFinished = true;
             pthread_mutex_unlock(&queueMutex);
             break;
         }
 
-        // 2) allocate RGBA buffer and convert
+        // 4) allocate RGBA buffer and convert
         VideoFrame* vf = new VideoFrame();
-        vf->width = width;
-        vf->height = height;
-        vf->ptsMs = videoDecoder->getFramePtsMs();
+        vf->width    = width;
+        vf->height   = height;
+        vf->ptsMs    = videoDecoder->getFramePtsMs(); // already ms
         vf->dataSize = frameSizeBytes;
-        vf->data = new uint8_t[frameSizeBytes];
+        vf->eof      = false;
+        vf->data     = new uint8_t[frameSizeBytes];
 
         int convRet = videoDecoder->toRGBA(vf->data, frameSizeBytes);
         if (convRet <= 0) {
@@ -130,9 +149,40 @@ void VideoDecoderController::decodeLoop() {
             continue;
         }
 
-        // 3) push to queue
+        // 5) push to queue
         pushFrame(vf);
     }
+
+    // optional: on thread exit, ensure readers see EOF
+    pthread_mutex_lock(&queueMutex);
+    if (!isFinished) {
+        VideoFrame* eofFrame = new VideoFrame();
+        memset(eofFrame, 0, sizeof(VideoFrame));
+        eofFrame->eof = true;
+        frameQueue.push(eofFrame);
+        pthread_cond_broadcast(&queueCond);
+        isFinished = true;
+    }
+    pthread_mutex_unlock(&queueMutex);
+}
+
+void VideoDecoderController::clearFrameQueue() {
+    // Protect queue while clearing
+    pthread_mutex_lock(&queueMutex);
+
+    while (!frameQueue.empty()) {
+        VideoFrame* frame = frameQueue.front();
+        frameQueue.pop();
+
+        if (frame) {
+            // You already use this in decodeLoop, so reuse it here
+            freeFrame(frame);
+        }
+    }
+
+    pthread_mutex_unlock(&queueMutex);
+
+    LOGI("VideoDecoderController::clearFrameQueue() - all frames cleared");
 }
 
 void VideoDecoderController::pushFrame(VideoFrame* frame) {
@@ -168,7 +218,7 @@ int VideoDecoderController::getFrame(VideoFrame*& frameOut) {
     VideoFrame* f = popFrameInternal();
 
     // wake producer if queue was full
-    if (frameQueue.size() < QUEUE_MAX_SIZE) {
+    if (frameQueue.size() < QUEUE_MIN_SIZE) {
         pthread_cond_signal(&queueCond);
     }
 
@@ -191,4 +241,54 @@ void VideoDecoderController::freeFrame(VideoFrame* frame) {
         frame->data = nullptr;
     }
     delete frame;
+}
+
+void VideoDecoderController::seek(int64_t positionMs) {
+    needSeek = true;
+    pendingSeekMs = positionMs;
+}
+
+void VideoDecoderController::play() {
+    if (!running) {
+        // First time: start decode thread
+        running = true;
+        playing = true;
+        started = true;
+
+        int createRet = pthread_create(
+                &decodeThread,
+                nullptr,
+                &VideoDecoderController::decodeThreadEntry,
+                this
+        );
+        if (createRet != 0) {
+            LOGE("VideoDecoderController::play() - pthread_create failed: %d", createRet);
+            running = false;
+
+            delete videoDecoder;
+            videoDecoder = nullptr;
+            return;
+        }
+    } else {
+        // Thread already exists → treat this as "play from start"
+        needSeek = true;
+        pendingSeekMs = 0;   // seek to 0ms (beginning)
+
+        playing = true;
+        started = true;
+    }
+}
+
+void VideoDecoderController::resume() {
+    playing = true;
+    pthread_mutex_lock(&queueMutex);
+    pthread_cond_broadcast(&queueCond);
+    pthread_mutex_unlock(&queueMutex);
+}
+
+void VideoDecoderController::pause() {
+    playing = false;
+    pthread_mutex_lock(&queueMutex);
+    pthread_cond_broadcast(&queueCond);
+    pthread_mutex_unlock(&queueMutex);
 }

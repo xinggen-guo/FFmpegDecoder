@@ -314,7 +314,7 @@
  * @}
  */
 
-#include <time.h>
+#include <ffmpeg_time.h>
 #include <stdio.h>  /* FILE */
 #include "libavcodec/avcodec.h"
 #include "libavutil/dict.h"

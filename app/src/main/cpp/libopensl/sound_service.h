@@ -232,6 +232,8 @@ public:
 	bool isPlaying();
     int64_t getCurrentTimeMills();
 
+    int64_t getAudioClockMs();
+
 	/**
 	 * Destroy the player context.
 	 */

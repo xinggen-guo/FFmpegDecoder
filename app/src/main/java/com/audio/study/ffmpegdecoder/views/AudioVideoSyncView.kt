@@ -73,7 +73,6 @@ class AudioVideoSyncView @JvmOverloads constructor(
     fun play(audioClockProvider: AudioClockProvider? = null) {
         this.audioClockProvider = audioClockProvider
 
-        if (isPlaying) return
         if (!prepared) {
             ToastUtils.showShort("Video not prepared")
             return
@@ -83,13 +82,49 @@ class AudioVideoSyncView @JvmOverloads constructor(
             return
         }
 
+        // "Play" means: from start (or from last seek), not resume
+        if (!running) {
+            running = true
+        }
+
+        // Notify native: start play (may start thread & seek to 0 inside controller)
+        videoPlayer.nativePlay()
+
+        // View-level playing flag + render thread
         isPlaying = true
         startRenderThread()
     }
 
+
     fun pause() {
-        isPlaying = false
-        stopRenderThread()
+        if (!isPlaying) return
+        isPlaying = false                // make renderLoop exit
+        videoPlayer.nativePause()
+    }
+
+    fun resume(audioClockProvider: AudioClockProvider? = null) {
+        this.audioClockProvider = audioClockProvider
+
+        if (!prepared) {
+            ToastUtils.showShort("Video not prepared")
+            return
+        }
+        if (!surfaceReady) {
+            ToastUtils.showShort("Surface not ready")
+            return
+        }
+        if (isPlaying) return   // already playing
+        videoPlayer.nativeResume()
+        isPlaying = true
+
+        if (renderThread == null || !renderThread!!.isAlive) {
+            running = true
+            startRenderThread()
+        }
+    }
+
+    fun seek(pendingProgress: Long) {
+        videoPlayer.nativeSeek(pendingProgress)
     }
 
     fun release() {
@@ -134,7 +169,12 @@ class AudioVideoSyncView @JvmOverloads constructor(
 
     private fun stopRenderThread() {
         running = false
-        renderThread?.join()
+        val t = renderThread
+        if (t != null && t.isAlive) {
+            try {
+                t.join(50) // or remove join completely
+            } catch (_: InterruptedException) {}
+        }
         renderThread = null
     }
 
@@ -148,15 +188,19 @@ class AudioVideoSyncView @JvmOverloads constructor(
         val ptsOut = LongArray(1)
         val maxLateMs = 80L
 
-        var firstVideoPts = -1L
         var debugFrameCount = 0
+        while (running && surfaceReady) {
 
-        while (running && surfaceReady && isPlaying) {
+            if (!isPlaying) {
+                Thread.sleep(10)
+                continue
+            }
+
             buffer.clear()
             ptsOut[0] = 0L
 
             val status = videoPlayer.nativeDecodeToRgbaWithPts(buffer, ptsOut)
-            val framePtsMs = ptsOut[0]
+            val framePtsMs = ptsOut[0]   // <-- should be "ms from file start"
 
             when (status) {
                 MediaStatus.EOF -> break
@@ -166,35 +210,30 @@ class AudioVideoSyncView @JvmOverloads constructor(
                 }
                 MediaStatus.ERROR -> break
 
-
                 else -> {
-                    // 1) First frame → set video PTS base
-                    if (firstVideoPts < 0) {
-                        firstVideoPts = framePtsMs
-                    }
+                    // if (firstVideoPts < 0) { firstVideoPts = framePtsMs }
+                    // val videoTimeMs = framePtsMs - firstVideoPts
 
-                    // 2) Compute "video time" since first frame
-                    val videoTimeMs = framePtsMs - firstVideoPts
+                    // ✅ use absolute timeline instead
+                    val videoTimeMs = framePtsMs
 
-                    // 3) Get audio clock (ms since audio playback started)
                     val audioClockMs = audioClockProvider?.getAudioClockMs()
 
                     val delayMs: Long
                     val audioUsedMs: Long
 
-                    if (audioClockMs != null && audioClockMs > 0) {
-                        // AV-sync case: audio is master clock
+                    if (audioClockMs != null && audioClockMs >= 0) {
+                        // audio is master clock on the same timeline
                         audioUsedMs = audioClockMs
                         delayMs = videoTimeMs - audioClockMs
                     } else {
-                        // No audio clock → fallback (no real sync, but still play)
                         audioUsedMs = -1L
                         delayMs = 0L
                     }
 
                     // ---- DEBUG LOG & CALLBACK ----
                     debugFrameCount++
-                    if (debugFrameCount % 5 == 0) { // log every 5 frames to avoid spam
+                    if (debugFrameCount % 5 == 0) {
                         LogUtil.i(
                             "AV_SYNC",
                             "video=$videoTimeMs ms, audio=$audioUsedMs ms, diff=${videoTimeMs - audioUsedMs}"
@@ -204,48 +243,35 @@ class AudioVideoSyncView @JvmOverloads constructor(
                             val v = videoTimeMs
                             val a = audioUsedMs
                             val d = if (a >= 0) v - a else 0L
-                            mainHandler.post {
-                                cb(v, a, d)
-                            }
+                            mainHandler.post { cb(v, a, d) }
                         }
                     }
                     // ------------------------------
 
-                    if (audioClockMs != null && audioClockMs > 0) {
-                        // Sync logic only when audio clock is valid
+                    if (audioClockMs != null && audioClockMs >= 0) {
                         when {
                             delayMs > 1 -> {
                                 Thread.sleep(delayMs.coerceAtMost(40))
                             }
                             delayMs < -maxLateMs -> {
-                                // too late → drop frame
+                                // video is too late → drop this frame
                                 continue
                             }
-                            else -> Unit // small early/late, draw now
+                            else -> Unit
                         }
                     }
-                    // else → no sync, just draw immediately
 
-                    // 4) Draw video frame
+                    // draw bitmap (your dstRect logic here, unchanged)
                     buffer.position(0)
                     bitmap.copyPixelsFromBuffer(buffer)
-
                     val canvas = holder.lockCanvas() ?: continue
                     try {
                         val viewW = width
-                        val viewH = height
-                        val viewRatio = viewW.toFloat() / viewH
                         val videoRatio = w.toFloat() / h
-
-                        dstRect = if (videoRatio > viewRatio) {
-                            val scaledH = (viewW / videoRatio).toInt()
-                            val top = (viewH - scaledH) / 2
-                            Rect(0, top, viewW, top + scaledH)
-                        } else {
-                            val scaledW = (viewH * videoRatio).toInt()
-                            val left = (viewW - scaledW) / 2
-                            Rect(left, 0, left + scaledW, viewH)
-                        }
+                        val scaledW = viewW
+                        val scaledH = (scaledW / videoRatio).toInt()
+                        val dstRect = Rect(0, 0, viewW, scaledH)
+                        val srcRect = Rect(0, 0, w, h)
 
                         canvas.drawColor(0xFF000000.toInt())
                         canvas.drawBitmap(bitmap, srcRect, dstRect, null)

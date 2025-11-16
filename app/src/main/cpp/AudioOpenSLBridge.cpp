@@ -80,6 +80,14 @@ Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getProgress(JNI
 }
 extern "C"
 JNIEXPORT jlong JNICALL
+Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getAudioClockMs(JNIEnv *env,
+                                                                                 jobject thiz) {
+    if (NULL != soundService) {
+        return soundService->getCurrentTimeMills();
+    }
+}
+extern "C"
+JNIEXPORT jlong JNICALL
 Java_com_audio_study_ffmpegdecoder_opensles_SoundTrackController_getDuration(JNIEnv *env,
                                                                              jobject thiz) {
     if (NULL != soundService) {

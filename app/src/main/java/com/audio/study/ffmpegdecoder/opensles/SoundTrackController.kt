@@ -43,6 +43,8 @@ class SoundTrackController : NativeOnSoundTrackListener {
      */
     external fun getProgress(): Int
 
+    external fun getAudioClockMs(): Long
+
     external fun setVisualizerEnable(d: Boolean)
 
     external fun nativeGetSpectrum(spectrum: FloatArray)
@@ -70,6 +72,8 @@ class SoundTrackController : NativeOnSoundTrackListener {
     fun setOnSoundTrackListener(onSoundTrackListener: OnSoundTrackListener?) {
         this.onSoundTrackListener = onSoundTrackListener
     }
+
+
 }
 
 interface NativeOnSoundTrackListener {

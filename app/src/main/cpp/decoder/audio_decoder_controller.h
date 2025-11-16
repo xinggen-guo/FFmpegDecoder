@@ -24,7 +24,13 @@ private:
     bool isRunning;
     pthread_mutex_t mLock;
     pthread_cond_t mCondition;
-    int64_t progress;
+    // UI timeline: just where in the file this packet starts
+    int64_t progressMs = 0;
+
+    // clock fields (all in ms)
+    int64_t audioClockStartMs   = 0;  // media time when current buffer started
+    int64_t audioClockUpdateMs  = 0;  // monotonic time when we last filled buffer
+    int     lastBufferDurationMs = 0; // duration of current buffer
     int64_t seekTime = -1;
     bool needSeek;
 
@@ -50,6 +56,8 @@ public:
     void seek(const long seek_time);
 
     int64_t getProgress();
+
+    int64_t getAudioClockMs() const;
 
     AudioDecoderController() {
         needSeek = false;

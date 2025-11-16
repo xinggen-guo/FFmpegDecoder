@@ -93,6 +93,10 @@ class OpenSlesAudioPlayer {
         return native.getProgress()
     }
 
+    fun getAudioClockMs(): Long {
+        return native.getAudioClockMs()
+    }
+
     fun getDuration(): Long {
         return native.getDuration()
     }
@@ -110,4 +114,5 @@ class OpenSlesAudioPlayer {
     fun getWaveform(out: FloatArray) {
         native.nativeGetWaveform(out)
     }
+
 }

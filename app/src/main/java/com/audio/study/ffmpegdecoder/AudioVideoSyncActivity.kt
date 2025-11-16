@@ -2,6 +2,7 @@ package com.audio.study.ffmpegdecoder
 
 import android.os.Bundle
 import android.os.Handler
+import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import com.audio.study.ffmpegdecoder.common.AudioClockProvider
 import com.audio.study.ffmpegdecoder.databinding.ActivityAudioVideoSyncBinding
@@ -29,6 +30,9 @@ class AudioVideoSyncActivity : AppCompatActivity() {
     private var audioPrepared = false
     private var videoPrepared = false
 
+    private var progressJobRunning = false
+    private var isSeek = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAudioVideoSyncBinding.inflate(layoutInflater)
@@ -47,6 +51,9 @@ class AudioVideoSyncActivity : AppCompatActivity() {
         audioPlayer.onPrepared = { duration ->
             ToastUtils.showShort("Audio prepared: ${duration}ms")
             audioPrepared = true
+            val durationMs = audioPlayer.getDuration()
+            binding.videoProgress.max = durationMs.toInt()
+            binding.duration.text = formatMillisecond(durationMs)
             checkPrepared()
         }
 
@@ -90,7 +97,7 @@ class AudioVideoSyncActivity : AppCompatActivity() {
             // 2) start video, synced to audio clock
             binding.audioVideoSyncView.play(
                 audioClockProvider = AudioClockProvider {
-                    audioPlayer.getProgress().toLong()
+                    audioPlayer.getAudioClockMs()
                 }
             )
             startProgressUpdate()
@@ -101,6 +108,48 @@ class AudioVideoSyncActivity : AppCompatActivity() {
             binding.audioVideoSyncView.pause()
             stopProgressUpdate()
         }
+
+        binding.btnResume.setOnClickListener {
+            audioPlayer.resume()
+            binding.audioVideoSyncView.resume(
+                audioClockProvider = AudioClockProvider {
+                    audioPlayer.getAudioClockMs()
+                })
+            startProgressUpdate()
+        }
+
+        setupSeekBar()
+    }
+
+    private fun setupSeekBar() {
+        binding.videoProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            private var pendingProgress = 0
+
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (isSeek && fromUser) {
+                    pendingProgress = progress
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                isSeek = true
+                audioPlayer.pause()
+                binding.audioVideoSyncView.pause()
+                stopProgressUpdate()
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                isSeek = false
+                audioPlayer.seek(pendingProgress)
+                binding.audioVideoSyncView.seek(pendingProgress.toLong())
+                audioPlayer.resume()
+                binding.audioVideoSyncView.resume(
+                    audioClockProvider = AudioClockProvider {
+                        audioPlayer.getAudioClockMs()
+                    })
+                startProgressUpdate()
+            }
+        })
     }
 
     private fun checkPrepared() {
@@ -118,18 +167,23 @@ class AudioVideoSyncActivity : AppCompatActivity() {
 
     private val progressRunnable = object : Runnable {
         override fun run() {
-            val progress = audioPlayer.getProgress()
-            binding.audioTime.text = formatMillisecond(progress.toLong())
-            uiHandler.postDelayed(this, 50)
+            if (!progressJobRunning) return
+            if (!isSeek) {
+                val progress = audioPlayer.getProgress()
+                binding.progress.text = formatMillisecond(progress.toLong())
+                binding.videoProgress.progress = progress
+            }
+            uiHandler.postDelayed(this, 100)
         }
-
     }
 
     private fun startProgressUpdate() {
+        progressJobRunning = true
         uiHandler.post(progressRunnable)
     }
 
     private fun stopProgressUpdate() {
+        progressJobRunning = false
         uiHandler.removeCallbacks(progressRunnable)
     }
 

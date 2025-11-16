@@ -3,6 +3,7 @@
 //
 
 #include "video_decoder.h"
+#include "CommonTools.h"
 
 VideoDecoder::VideoDecoder() = default;
 
@@ -86,7 +87,6 @@ void VideoDecoder::close() {
 
 int VideoDecoder::decodeFrame() {
     int ret = 0;
-
     // read packets until we get a decoded frame or hit EOF
     while (true) {
         ret = av_read_frame(fmtCtx, packet);
@@ -146,6 +146,63 @@ int VideoDecoder::toRGBA(uint8_t* outBuffer, int bufferSize) {
     );
 
     return needed;  // bytes written
+}
+
+//milliseconds
+void VideoDecoder::setSeekPosition(int64_t positionMs) {
+    time_seek_ms = positionMs;
+}
+
+void VideoDecoder::seekFrame() {
+    // No valid context / stream
+    if (!fmtCtx || !codecCtx || !videoStream || videoStreamIndex < 0) {
+        LOGE("VideoDecoder::seekFrame() invalid state");
+        return;
+    }
+
+    // -1 means "no pending seek"
+    if (time_seek_ms < 0) {
+        LOGI("VideoDecoder::seekFrame() no pending seek, skip");
+        return;
+    }
+
+    LOGI("VideoDecoder::seekFrame() start, target=%lld ms",
+         static_cast<long long>(time_seek_ms));
+
+    // Convert milliseconds -> pts in videoStream->time_base
+    AVRational srcTimeBase = {1, 1000};              // ms
+    AVRational dstTimeBase = videoStream->time_base; // stream time_base
+
+    int64_t seekPts = av_rescale_q(time_seek_ms, srcTimeBase, dstTimeBase);
+    if (seekPts < 0) seekPts = 0;
+
+    int ret = av_seek_frame(
+            fmtCtx,
+            videoStreamIndex,
+            seekPts,
+            AVSEEK_FLAG_BACKWARD
+    );
+
+    if (ret < 0) {
+        LOGE("VideoDecoder::seekFrame() av_seek_frame failed, target=%lld ms",
+             static_cast<long long>(time_seek_ms));
+    } else {
+        LOGI("VideoDecoder::seekFrame() success, target=%lld ms",
+             static_cast<long long>(time_seek_ms));
+    }
+
+    // Flush decoder after seek, drop any buffered state
+    avcodec_flush_buffers(codecCtx);
+
+    // Also drop any content in current frame
+    if (frame) {
+        av_frame_unref(frame);
+    }
+
+    // Clear pending seek flag
+    time_seek_ms = -1;
+
+    LOGI("VideoDecoder::seekFrame() end");
 }
 
 double VideoDecoder::getFramePtsMs() const {

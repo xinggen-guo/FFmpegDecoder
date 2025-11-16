@@ -10,7 +10,6 @@
 #include "MediaStatus.h"
 
 // Single global controller for this demo.
-// If you later want multiple players, you can store pointer in Java field.
 static VideoDecoderController* gVideoController = nullptr;
 
 extern "C"
@@ -183,4 +182,33 @@ Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeDecodeToRgbaWithPts(
     VideoDecoderController::freeFrame(frame);
 
     return written;
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativePause(JNIEnv *env, jobject thiz) {
+    if (gVideoController) {
+        gVideoController->pause();
+    }
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeResume(JNIEnv *env, jobject thiz) {
+    if (gVideoController) {
+        gVideoController->resume();
+    }
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativePlay(JNIEnv *env, jobject thiz) {
+    if (gVideoController) {
+        gVideoController->play();
+    }
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeSeek(JNIEnv *env, jobject thiz,
+                                                                jlong pending_progress) {
+    if (gVideoController) {
+        gVideoController->seek(pending_progress);
+    }
 }

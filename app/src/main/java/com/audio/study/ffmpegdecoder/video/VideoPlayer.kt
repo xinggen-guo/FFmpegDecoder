@@ -17,6 +17,15 @@ class VideoPlayer {
 
     // JNI
     external fun nativeOpenVideo(path: String): Boolean
+
+    external fun nativePlay()
+
+    external fun nativePause()
+
+    external fun nativeResume()
+
+    external fun nativeSeek(pendingProgress: Long)
+
     external fun nativeCloseVideo()
     external fun nativeGetWidth(): Int
     external fun nativeGetHeight(): Int
@@ -54,4 +63,6 @@ class VideoPlayer {
     fun release() {
         nativeCloseVideo()
     }
+
+
 }

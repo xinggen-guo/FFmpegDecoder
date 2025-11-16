@@ -36,7 +36,7 @@ void AudioDecoderController::seek(const long seek_time) {
     seekTime = seek_time;
 
     //Immediately update “public” time so UI gets the new value
-    progress = seekTime;
+    progressMs = seekTime;
 
     // wake decode thread to apply the real seek
     pthread_cond_signal(&mCondition);
@@ -44,7 +44,7 @@ void AudioDecoderController::seek(const long seek_time) {
 }
 
 int64_t AudioDecoderController::getProgress() {
-    return progress;
+    return progressMs;
 }
 
 void AudioDecoderController::setVisualizerEnabled(bool enabled) {
@@ -64,14 +64,33 @@ int AudioDecoderController::readSamples(short *samples, int size) {
             result = MEDIA_STATUS_ERROR;
         } else {
             short *dataSamples = audioPacket->audioBuffer;
-            memcpy(samples, dataSamples, audioPacket->audioSize * 2);
-            if (audioDecoder->getSampleRate() > 0) {
-                int packetMs = (audioPacket->audioSize / audioDecoder->getChannels()) * 1000 / audioDecoder->getSampleRate();
-                progress += packetMs;
+            memcpy(samples, dataSamples, audioPacket->audioSize * sizeof(short));
+
+            // 1) Base PTS in ms: startPosition is usually in seconds (float)
+            int64_t baseMs = (int64_t)(audioPacket->startPosition * 1000.0f + 0.5f);
+
+            // 2) Duration of this buffer in ms
+            int channels   = audioDecoder->getChannels();
+            int sampleRate = audioDecoder->getSampleRate();
+            int samplesPerChannel = (channels > 0)
+                                    ? (audioPacket->audioSize / channels)
+                                    : audioPacket->audioSize;
+
+            int packetMs = 0;
+            if (sampleRate > 0) {
+                packetMs = (int)( (int64_t)samplesPerChannel * 1000 / sampleRate );
             }
+
+            // Update "progress"
+            progressMs = (int)baseMs;
+
+            // Update clock state used by getAudioClockMs()
+            audioClockStartMs   = baseMs;
+            audioClockUpdateMs  = nowMonotonicMs();  // from your new time util
+            lastBufferDurationMs = packetMs;
+
             audioFrameQueue.pop();
             result = audioPacket->audioSize;
-
             if (visualizerEnabled) {
                 AudioVisualizer::instance().onPcmData(
                         dataSamples,
@@ -151,6 +170,21 @@ void *AudioDecoderController::startDecoderThread(void *ptr) {
     pthread_mutex_unlock(&decoderController->mLock);
     decoderController->destroyDecoderThread();
     pthread_exit(0);
+}
+
+int64_t AudioDecoderController::getAudioClockMs() const {
+    // If we never played anything yet
+    if (lastBufferDurationMs <= 0) {
+        return (int64_t)progressMs; // fallback, or just 0
+    }
+
+    int64_t now   = nowMonotonicMs();       // CLOCK_MONOTONIC
+    int64_t delta = now - audioClockUpdateMs;
+
+    if (delta < 0) delta = 0;
+    if (delta > lastBufferDurationMs) delta = lastBufferDurationMs;
+
+    return audioClockStartMs + delta;
 }
 
 int AudioDecoderController::decodeSongPacket() {
