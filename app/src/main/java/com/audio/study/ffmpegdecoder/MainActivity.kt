@@ -50,6 +50,9 @@ class MainActivity : AppCompatActivity() {
         binding.videoAudioSyncSample.setOnClickListener {
             startActivity(Intent(this, AudioVideoSyncActivity::class.java))
         }
+        binding.XMediaPlayerSample.setOnClickListener {
+            startActivity(Intent(this, XMediaPlayerActivity::class.java))
+        }
     }
 
     /**

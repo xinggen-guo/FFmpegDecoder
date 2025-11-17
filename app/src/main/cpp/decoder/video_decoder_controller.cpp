@@ -34,7 +34,7 @@ int VideoDecoderController::init(const char* path) {
 
     running = false;
     isFinished = false;
-    return 0;
+    return MEDIA_STATUS_OK;
 }
 
 void VideoDecoderController::destroy() {
@@ -80,7 +80,6 @@ void VideoDecoderController::decodeLoop() {
     const int frameSizeBytes = width * height * 4;
 
     while (running) {
-
         // 1) handle pending seek
         if (needSeek) {
             int64_t target = pendingSeekMs.load();
@@ -234,6 +233,74 @@ int VideoDecoderController::getFrame(VideoFrame*& frameOut) {
     return MEDIA_STATUS_OK;
 }
 
+int VideoDecoderController::readFrameRGBA(uint8_t* dst, int64_t* ptsMs) {
+    if (!dst || !ptsMs) {
+        return MEDIA_STATUS_ERROR;
+    }
+
+    // Quick check: nothing running and nothing in queue → EOF
+    if (!running && isFinished) {
+        pthread_mutex_lock(&queueMutex);
+        bool empty = frameQueue.empty();
+        pthread_mutex_unlock(&queueMutex);
+        if (empty) {
+            return MEDIA_STATUS_EOF;
+        }
+    }
+
+    pthread_mutex_lock(&queueMutex);
+    if (frameQueue.empty()) {
+        // No frame available yet
+        if (isFinished) {
+            // decoder has finished, and no more frames in queue
+            pthread_mutex_unlock(&queueMutex);
+            return MEDIA_STATUS_EOF;
+        } else {
+            // still decoding, just no frame right now
+            pthread_mutex_unlock(&queueMutex);
+            return MEDIA_STATUS_BUFFERING;
+        }
+    }
+    // Get front frame
+    VideoFrame* vf = frameQueue.front();
+    frameQueue.pop();
+
+    size_t currentSize = frameQueue.size();
+    if (running && currentSize <= QUEUE_MIN_SIZE) {
+        pthread_cond_signal(&queueCond);
+    }
+
+    pthread_mutex_unlock(&queueMutex);
+
+    if (!vf) {
+        return MEDIA_STATUS_ERROR;
+    }
+
+    // EOF marker frame (virtual frame to indicate end)
+    if (vf->eof) {
+        freeFrame(vf);
+        return MEDIA_STATUS_EOF;
+    }
+
+    // Normal frame: copy RGBA data
+    const int frameSizeBytes = width * height * 4;
+    if (vf->dataSize < frameSizeBytes) {
+        // Data size mismatch → treat as error and drop
+        freeFrame(vf);
+        return MEDIA_STATUS_ERROR;
+    }
+
+    std::memcpy(dst, vf->data, frameSizeBytes);
+
+    if (ptsMs) {
+        *ptsMs = vf->ptsMs;
+    }
+
+    freeFrame(vf);
+
+    return MEDIA_STATUS_OK;
+}
+
 void VideoDecoderController::freeFrame(VideoFrame* frame) {
     if (!frame) return;
     if (frame->data) {
@@ -253,7 +320,6 @@ void VideoDecoderController::play() {
         // First time: start decode thread
         running = true;
         playing = true;
-        started = true;
 
         int createRet = pthread_create(
                 &decodeThread,
@@ -262,7 +328,6 @@ void VideoDecoderController::play() {
                 this
         );
         if (createRet != 0) {
-            LOGE("VideoDecoderController::play() - pthread_create failed: %d", createRet);
             running = false;
 
             delete videoDecoder;
@@ -273,9 +338,7 @@ void VideoDecoderController::play() {
         // Thread already exists → treat this as "play from start"
         needSeek = true;
         pendingSeekMs = 0;   // seek to 0ms (beginning)
-
         playing = true;
-        started = true;
     }
 }
 
@@ -291,4 +354,34 @@ void VideoDecoderController::pause() {
     pthread_mutex_lock(&queueMutex);
     pthread_cond_broadcast(&queueCond);
     pthread_mutex_unlock(&queueMutex);
+}
+
+void VideoDecoderController::stop() {
+    // 1) Stop decode loop
+    running = false;
+    needSeek = false;
+
+    // Wake up decodeLoop if it's waiting on queueCond
+    pthread_mutex_lock(&queueMutex);
+    pthread_cond_broadcast(&queueCond);
+    pthread_mutex_unlock(&queueMutex);
+
+    // 2) Join decode thread
+    //    (assuming decodeThread was created with pthread_create)
+    if (decodeThread) {
+        pthread_join(decodeThread, nullptr);
+        decodeThread = 0;
+    }
+
+    // 3) Clear remaining frames in queue
+    clearFrameQueue();
+
+    // 4) Reset state flags
+    isFinished = false;
+
+    // 5) Destroy underlying decoder
+    if (videoDecoder) {
+        delete videoDecoder;
+        videoDecoder = nullptr;
+    }
 }

@@ -27,6 +27,19 @@ public:
     //  -2  : no frame available yet (buffering)
     int getFrame(VideoFrame*& frameOut);
 
+
+    /**
+    * Consumer side: read one decoded frame as RGBA.
+    *
+    * Called by JNI (FfmpegVideoEngine.nativeReadFrame).
+    *
+    * @param dst    output RGBA buffer, size >= width * height * 4
+    * @param ptsMs  [out] presentation timestamp in milliseconds
+    *
+    * @return MediaStatus_OK / MediaStatus_EOF / MediaStatus_BUFFERING / MediaStatus_ERROR
+    */
+    int readFrameRGBA(uint8_t* dst, int64_t* ptsMs);
+
     // After rendering, caller must free frame buffer
     static void freeFrame(VideoFrame* frame);
 
@@ -44,6 +57,11 @@ public:
 
     // Pause decode (keep thread alive)
     void pause();
+
+    /**
+     * Stop decode thread, clear resources (but does not delete the controller itself).
+     */
+    void stop();
 
 private:
     static void* decodeThreadEntry(void* arg);
@@ -68,7 +86,6 @@ private:
 
     std::atomic<bool> running{false};   // decode thread exists
     std::atomic<bool> playing{false};   // currently playing (not paused)
-    std::atomic<bool> started{false};   // has play-from-start been called
 
     int width = 0;
     int height = 0;

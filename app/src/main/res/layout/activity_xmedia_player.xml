@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:id="@+id/root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	tools:context=".XMediaPlayerActivity">
+	
+	<!-- Video surface -->
+	<SurfaceView
+		android:id="@+id/surfaceView"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		app:layout_constraintTop_toTopOf="parent"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintBottom_toTopOf="@+id/controlPanel" />
+	
+	<!-- Control panel -->
+	<LinearLayout
+		android:id="@+id/controlPanel"
+		android:layout_width="0dp"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		android:background="#22ff00"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"
+		app:layout_constraintBottom_toBottomOf="parent">
+		
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:gravity="center_vertical">
+			
+			<Button
+				android:id="@+id/btnPrepare"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textSize="10dp"
+				android:text="Prepare" />
+			
+			<Button
+				android:id="@+id/btnPlay"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textSize="10dp"
+				android:text="Play"
+				android:enabled="false" />
+			
+			<Button
+				android:id="@+id/btnPause"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textSize="10dp"
+				android:text="Pause"
+				android:enabled="false" />
+			
+			<Button
+				android:id="@+id/btnResume"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textSize="10dp"
+				android:text="Resume"
+				android:enabled="false" />
+		</LinearLayout>
+		
+		<SeekBar
+			android:id="@+id/seekBar"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:max="1000" />
+		
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal">
+			
+			<TextView
+				android:id="@+id/txtCurrent"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textColor="#FFFFFF"
+				android:text="00:00" />
+			
+			<TextView
+				android:id="@+id/txtDuration"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:textAlignment="textEnd"
+				android:textColor="#FFFFFF"
+				android:text="00:00" />
+		</LinearLayout>
+	</LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

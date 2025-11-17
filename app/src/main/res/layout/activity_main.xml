@@ -65,5 +65,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/videoSample" />
+    
+    <Button
+        android:id="@+id/XMediaPlayerSample"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="XMediaPlayerSample"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoAudioSyncSample" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

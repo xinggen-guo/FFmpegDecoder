@@ -195,11 +195,19 @@ bool SoundService::initSongDecoder(const char* accompanyPath) {
 }
 
 void SoundService::callReady() {
-    JNIEnv* env = nullptr;
+    JNIEnv *env = nullptr;
     bool needDetach = false;
-
+    LOGE("callReady");
+    if (!g_jvm) {
+        LOGE("%s: g_jvm is null", __FUNCTION__);
+        return;
+    }
+    if (!obj) {
+        LOGE("%s: obj is null (no global ref)", __FUNCTION__);
+        return;
+    }
     // 1. 尝试获取当前线程的 JNIEnv
-    jint getEnvResult = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    jint getEnvResult = g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
     if (getEnvResult == JNI_EDETACHED) {
         // 当前线程还没附加 → 附加一下
         if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {

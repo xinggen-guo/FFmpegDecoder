@@ -59,6 +59,8 @@ public:
 
     int64_t getAudioClockMs() const;
 
+    int getChannels();
+
     AudioDecoderController() {
         needSeek = false;
         seekTime = 0;

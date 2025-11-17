@@ -128,7 +128,7 @@ void AudioDecoderController::destroy() {
 
 
 void AudioDecoderController::initDecoderThread() {
-    LOGI("initDecoderThread");
+    LOGI("initDecoderThread--start");
     isRunning = true;
     pthread_mutex_init(&mLock, NULL);
     pthread_cond_init(&mCondition, NULL);
@@ -185,6 +185,10 @@ int64_t AudioDecoderController::getAudioClockMs() const {
     if (delta > lastBufferDurationMs) delta = lastBufferDurationMs;
 
     return audioClockStartMs + delta;
+}
+
+int AudioDecoderController::getChannels() {
+    return audioDecoder->getChannels();
 }
 
 int AudioDecoderController::decodeSongPacket() {

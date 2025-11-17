@@ -46,6 +46,11 @@
             android:label="AudioVideoSyncDemo"
             android:screenOrientation="portrait"
             android:exported="false" />
+        <activity
+            android:name=".XMediaPlayerActivity"
+            android:label="XMediaPlayerDemo"
+            android:screenOrientation="portrait"
+            android:exported="false" />
     </application>
 
 </manifest>
