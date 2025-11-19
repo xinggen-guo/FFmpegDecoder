@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.audio.study.ffmpegdecoder.databinding.ActivityXmediaPlayerBinding
 import com.audio.study.ffmpegdecoder.player.XMediaPlayer
 import com.audio.study.ffmpegdecoder.player.engine.FfmpegVideoEngine
+import com.audio.study.ffmpegdecoder.player.engine.MediaCodecVideoEngine
 import com.audio.study.ffmpegdecoder.player.engine.OpenSlAudioEngine
 import com.audio.study.ffmpegdecoder.player.interfaces.AudioEngine
 import com.audio.study.ffmpegdecoder.player.interfaces.VideoEngine
@@ -43,6 +44,7 @@ class XMediaPlayerActivity : AppCompatActivity() {
         val renderer = SoftwareCanvasRenderer(binding.surfaceView)
         val audioEngine: AudioEngine = OpenSlAudioEngine()
         val videoEngine: VideoEngine = FfmpegVideoEngine()
+//        val videoEngine: VideoEngine = MediaCodecVideoEngine()
         xPlayer = XMediaPlayer(audioEngine, videoEngine, renderer)
 
         // Surface is technically not needed by SoftwareCanvasRenderer,
@@ -89,6 +91,12 @@ class XMediaPlayerActivity : AppCompatActivity() {
                     binding.txtCurrent.text = formatMillisecond(positionMs)
                 }
             }
+
+            override fun onEndResume() {
+                binding.btnPlay.isEnabled = false
+                binding.btnPause.isEnabled = true
+                binding.btnResume.isEnabled = false
+            }
         }
 
         binding.btnPrepare.setOnClickListener {
@@ -102,6 +110,9 @@ class XMediaPlayerActivity : AppCompatActivity() {
         }
 
         binding.btnPlay.setOnClickListener {
+            if(xPlayer.isPlayerCompleted()){
+                xPlayer.seekTo(0)
+            }
             xPlayer.play()
             binding.btnPlay.isEnabled = false
             binding.btnPause.isEnabled = true
@@ -127,18 +138,18 @@ class XMediaPlayerActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (isUserSeeking && fromUser) {
                     pendingProgress = progress
+                    xPlayer.updateSeekPreview(pendingProgress.toLong())
                 }
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
                 isUserSeeking = true
-                xPlayer.pause()
+                xPlayer.beginSeekPreview()
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
                 isUserSeeking = false
-                xPlayer.seekTo(pendingProgress.toLong())
-                xPlayer.resume()
+                xPlayer.endSeekPreview(pendingProgress.toLong(), true)
             }
 
         })

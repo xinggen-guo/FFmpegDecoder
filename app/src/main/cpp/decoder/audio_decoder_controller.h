@@ -20,6 +20,7 @@ class AudioDecoderController {
 
 private:
     AudioDecoder *audioDecoder = nullptr;
+    bool mutexValid = false;
     pthread_t     audioDecoderThread{};
     std::queue<PcmFrame *> audioFrameQueue;
     bool          isRunning = false;
@@ -48,7 +49,7 @@ public:
     int dataSize = 0;
 
     AudioDecoderController() = default;
-
+    virtual ~AudioDecoderController();
     int      getMusicMeta(const char *audioPath, int *metaArray);
     int      prepare(const char *audioPath);
     void     seek(const long seek_time);

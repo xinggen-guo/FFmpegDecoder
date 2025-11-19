@@ -162,6 +162,7 @@ void VideoDecoderController::decodeLoop() {
         pthread_cond_broadcast(&queueCond);
         isFinished = true;
     }
+    running = false;
     pthread_mutex_unlock(&queueMutex);
 }
 
@@ -311,8 +312,48 @@ void VideoDecoderController::freeFrame(VideoFrame* frame) {
 }
 
 void VideoDecoderController::seek(int64_t positionMs) {
+    LOGI("VideoDecoderController::seek -> %lld ms", (long long)positionMs);
+
+    if (!videoDecoder) {
+        LOGE("VideoDecoderController::seek: videoDecoder is null, ignore");
+        return;
+    }
+
+    // If decode thread already finished (EOF or after stop),
+    // we may need to restart it so that 'needSeek' is actually processed.
+    if (!running) {
+        LOGI("VideoDecoderController::seek: thread not running, restart decode thread");
+
+        clearFrameQueue();        // safe: decode thread not running
+        // Reset EOF / queue state
+        pthread_mutex_lock(&queueMutex);
+        isFinished = false;
+        pthread_mutex_unlock(&queueMutex);
+
+        needSeek = false;
+
+        running = true;
+        int createRet = pthread_create(
+                &decodeThread,
+                nullptr,
+                &VideoDecoderController::decodeThreadEntry,
+                this
+        );
+        if (createRet != 0) {
+            LOGE("VideoDecoderController::seek: pthread_create failed=%d", createRet);
+            running = false;
+            return;
+        }
+    }
+
+    // Now thread is alive, tell it to seek
     needSeek = true;
     pendingSeekMs = positionMs;
+
+    // Wake decodeLoop if it is waiting on the queueCond
+    pthread_mutex_lock(&queueMutex);
+    pthread_cond_broadcast(&queueCond);
+    pthread_mutex_unlock(&queueMutex);
 }
 
 void VideoDecoderController::play() {
@@ -337,7 +378,7 @@ void VideoDecoderController::play() {
     } else {
         // Thread already exists → treat this as "play from start"
         needSeek = true;
-        pendingSeekMs = 0;   // seek to 0ms (beginning)
+//        pendingSeekMs = 0;   // seek to 0ms (beginning)
         playing = true;
     }
 }

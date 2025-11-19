@@ -44,6 +44,7 @@ Java_com_audio_study_ffmpegdecoder_player_engine_OpenSlAudioEngine_nativePrepare
     // 3) prepare metadata (duration, sample rate, etc.)
 
     bool ok = service->initSongDecoder(path.c_str());
+    service->initSoundTrack();
     if (!ok) {
         LOGE("initSongDecoder failed");
         return JNI_FALSE;
@@ -66,7 +67,6 @@ Java_com_audio_study_ffmpegdecoder_player_engine_OpenSlAudioEngine_nativePlay(
     if (!service) return;
 
     LOGI("OpenSlAudioEngine.nativePlay");
-    service->initSoundTrack();
     service->play();   // adapt to your real method, e.g. startPlay / play
 }
 

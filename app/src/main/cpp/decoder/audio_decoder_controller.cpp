@@ -7,6 +7,11 @@
 #include "audio_visualizer.h"
 #include "MediaStatus.h"
 
+AudioDecoderController::~AudioDecoderController() {
+    destroy();
+}
+
+
 int AudioDecoderController::getMusicMeta(const char *audioPath, int *metaArray) {
     int result = 0;
     audioDecoder = new AudioDecoder();
@@ -55,22 +60,25 @@ int AudioDecoderController::prepare(const char *audioPath) {
 }
 
 void AudioDecoderController::seek(const long seek_time) {
-    LOGI("seek to %ld ms", seek_time);
+    // If decoder thread was already torn down, just ignore the seek
+    if (!mutexValid) {
+        LOGE("AudioDecoderController::seek called after destroy, ignore");
+        return;
+    }
+
+    if(!isRunning){
+        LOGI("seek: decoder thread is not running, restart it");
+        initDecoderThread();   // re-create mutex/cond + thread
+    }
 
     pthread_mutex_lock(&mLock);
 
     needSeek = true;
     seekTime = seek_time;
 
-    // Immediately update "public" time so UI gets the new value
+    // Immediately update “public” time so UI gets value
     progressMs = seekTime;
 
-    // Reset audio clock; until new buffers arrive, getAudioClockMs will fall back
-    audioClockStartMs     = seekTime;
-    audioClockUpdateMs    = nowMonotonicMs();
-    lastBufferDurationMs  = 0;
-
-    // wake decode thread to apply the real seek
     pthread_cond_signal(&mCondition);
     pthread_mutex_unlock(&mLock);
 }
@@ -167,27 +175,62 @@ int AudioDecoderController::readSamples(short *samples, int size) {
 
 void AudioDecoderController::destroy() {
     LOGI("destroy");
-    isRunning = false;
 
+    // If already cleaned up, do nothing
+    if (!mutexValid && !isRunning && audioDecoder == nullptr && audioFrameQueue.empty()) {
+        return;
+    }
+
+    // 1) Ask thread to stop
+    if (isRunning) {
+        isRunning = false;
+
+        if (mutexValid) {
+            pthread_mutex_lock(&mLock);
+            pthread_cond_signal(&mCondition);
+            pthread_mutex_unlock(&mLock);
+        }
+
+        // 2) Join the decoder thread to ensure it's fully exited
+        if (audioDecoderThread) {
+            pthread_join(audioDecoderThread, nullptr);
+            audioDecoderThread = 0;
+        }
+    }
+
+    // 3) Clean remaining packets in queue (optional but good hygiene)
+    while (!audioFrameQueue.empty()) {
+        PcmFrame* packet = audioFrameQueue.front();
+        audioFrameQueue.pop();
+        delete packet;
+    }
+
+    // 4) Destroy underlying decoder
     if (audioDecoder != nullptr) {
         audioDecoder->destroy();
         delete audioDecoder;
         audioDecoder = nullptr;
     }
 
-    // Clear queue
-    while (!audioFrameQueue.empty()) {
-        PcmFrame *pkt = audioFrameQueue.front();
-        audioFrameQueue.pop();
-        delete pkt;
+    // 5) Now it's safe to destroy mutex & cond
+    if (mutexValid) {
+        pthread_mutex_destroy(&mLock);
+        pthread_cond_destroy(&mCondition);
+        mutexValid = false;
     }
+
+    LOGI("destroy -- done");
+
 }
 
 void AudioDecoderController::initDecoderThread() {
     LOGI("initDecoderThread--start");
     isRunning = true;
-    pthread_mutex_init(&mLock, nullptr);
-    pthread_cond_init(&mCondition, nullptr);
+    if (!mutexValid) {
+        pthread_mutex_init(&mLock, NULL);
+        pthread_cond_init(&mCondition, NULL);
+        mutexValid = true;
+    }
     pthread_create(&audioDecoderThread, nullptr, startDecoderThread, this);
 }
 
@@ -236,7 +279,6 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
     decoderController->isRunning = false;
     pthread_mutex_unlock(&decoderController->mLock);
 
-    decoderController->destroyDecoderThread();
     pthread_exit(nullptr);
 }
 
@@ -280,12 +322,4 @@ int AudioDecoderController::decodeSongPacket() {
 void AudioDecoderController::destroyDecoderThread() {
     LOGI("destroyDecoderThread");
     isRunning = false;
-
-    int getLockCode = pthread_mutex_lock(&mLock);
-    (void)getLockCode;
-    pthread_cond_signal(&mCondition);
-    pthread_mutex_unlock(&mLock);
-
-    pthread_mutex_destroy(&mLock);
-    pthread_cond_destroy(&mCondition);
 }

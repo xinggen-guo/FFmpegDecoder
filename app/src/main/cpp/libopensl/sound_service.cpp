@@ -151,6 +151,10 @@ SLresult SoundService::stop() {
 }
 
 SLresult SoundService::play() {
+    LOGE("play ----  11111");
+    if(!initedSoundTrack){
+        initSoundTrack();
+    }
     if (!audioPlayerPlay || !audioPlayerBufferQueue || !decoderController) {
         LOGE("play: missing components");
         return SL_RESULT_PRECONDITIONS_VIOLATED;
@@ -167,7 +171,7 @@ SLresult SoundService::play() {
         producePacket();
         if (playingState != PLAYING_STATE_PLAYING) break;
     }
-
+    LOGE("play ----  22222");
     return SL_RESULT_SUCCESS;
 }
 
@@ -184,18 +188,27 @@ SLresult SoundService::pause() {
 SLresult SoundService::resume() {
     LOGI("enter SoundService::resume()...");
 
-    SLresult result = SetAudioPlayerStatePlaying();
-    if (SL_RESULT_SUCCESS != result) {
-        return result;
+    if (!audioPlayerPlay || !audioPlayerBufferQueue || !decoderController) {
+        LOGE("resume: missing components");
+        return SL_RESULT_PRECONDITIONS_VIOLATED;
     }
+
+    // 1) mark playing so producePacket() passes the state check
     playingState = PLAYING_STATE_PLAYING;
 
-    // Prefill OpenSL queue after resume (especially after seek+clear)
-    if (audioPlayerBufferQueue && decoderController && mBuffer && mTarget) {
-        for (int i = 0; i < QUEUE_BUFFER_COUNT; ++i) {
-            producePacket();
-            if (playingState != PLAYING_STATE_PLAYING) break;
+    // 2) pre-fill the OpenSL queue
+    for (int i = 0; i < QUEUE_BUFFER_COUNT; ++i) {
+        producePacket();
+        if (playingState != PLAYING_STATE_PLAYING) {
+            break; // in case EOF/error fired inside producePacket
         }
+    }
+
+    // 3) start AudioTrack
+    SLresult result = SetAudioPlayerStatePlaying();
+    if (result != SL_RESULT_SUCCESS) {
+        LOGE("resume: SetAudioPlayerStatePlaying failed: %d", result);
+        return result;
     }
 
     return result;
@@ -219,17 +232,15 @@ void SoundService::seek(const long seek_time) {
     playedFrames   = 0;
     pthread_mutex_unlock(&clockMutex);
 
-    // reset ring-buffer indices and per-buffer counts
-    mCurrentFrame    = 0;
-    mPlayFrameIndex  = 0;
+    // reset indices
+    mCurrentFrame   = 0;
     memset(mFramesPerBuffer, 0, sizeof(mFramesPerBuffer));
     startPtsSet = false;
 
-    // 4) restart playback only if we were already playing
+    // 4) restart if we are in PLAYING state
     if (audioPlayerPlay && audioPlayerBufferQueue &&
         playingState == PLAYING_STATE_PLAYING) {
 
-        // pre-fill a few buffers
         for (int i = 0; i < mBufferNums; ++i) {
             producePacket();
         }
@@ -409,7 +420,10 @@ void SoundService::callComplete() {
 
 SLresult SoundService::initSoundTrack() {
     LOGI("enter SoundService::initSoundTrack");
-
+    if(initedSoundTrack){
+        LOGE("initSoundTrack: has inited");
+        return SL_RESULT_PRECONDITIONS_VIOLATED;
+    }
     OpenSLESContext* openSLESContext = OpenSLESContext::GetInstance();
     engineEngine = openSLESContext->getEngine();
     if (!engineEngine) {
@@ -552,10 +566,6 @@ void SoundService::DestroyContext() {
     if (outputMixObject) {
         (*outputMixObject)->Destroy(outputMixObject);
         outputMixObject = nullptr;
-    }
-
-    if (decoderController) {
-        decoderController->destroy();
     }
 
     SAFE_DELETE_ARRAY(mBuffer);
