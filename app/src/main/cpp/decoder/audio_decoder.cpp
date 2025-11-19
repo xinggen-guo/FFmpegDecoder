@@ -2,7 +2,6 @@
 // Created by guoxinggen on 2022/6/8.
 //
 
-
 #include "audio_decoder.h"
 #include "../common/CommonTools.h"
 #include <zlib.h>
@@ -15,7 +14,7 @@ int AudioDecoder::initAudioDecoder(const char *string) {
 
     int result = 0;
 
-    //1 注册所有解码器
+    // 1. register all decoders
     avcodec_register_all();
 
     avFormatContext = avformat_alloc_context();
@@ -27,7 +26,7 @@ int AudioDecoder::initAudioDecoder(const char *string) {
 
     avformat_find_stream_info(avFormatContext, NULL);
 
-    //找到音频数据流
+    // find audio stream
     for (int i = 0; i < avFormatContext->nb_streams; i++) {
         AVStream *stream = avFormatContext->streams[i];
         if (AVMEDIA_TYPE_AUDIO == stream->codec->codec_type) {
@@ -39,10 +38,9 @@ int AudioDecoder::initAudioDecoder(const char *string) {
         return -1;
     }
 
-    audioStream = avFormatContext->streams[audioIndex];
-
-    time_base = av_q2d(audioStream->time_base);
-    avCodecContext = audioStream->codec;
+    audioStream     = avFormatContext->streams[audioIndex];
+    time_base       = av_q2d(audioStream->time_base);
+    avCodecContext  = audioStream->codec;
     AVCodec *avCodec = avcodec_find_decoder(avCodecContext->codec_id);
     if (avCodec == NULL) {
         return -1;
@@ -52,22 +50,38 @@ int AudioDecoder::initAudioDecoder(const char *string) {
         return -1;
     }
 
-    channels = avCodecContext->channels;
+    channels   = avCodecContext->channels;
     sampleRate = avCodecContext->sample_rate;
-    int bufferSize = sampleRate * CHANNEL_PER_FRAME
-                                   * BITS_PER_CHANNEL / BITS_PER_BYTE;
-    packetBufferSize = bufferSize / 2 * 0.2;
+
+    // frames per channel in one packet
+    int framesPerPacket = static_cast<int>(sampleRate * AUDIO_PACKET_SEC + 0.5f);
+    if (framesPerPacket <= 0) {
+        framesPerPacket = sampleRate / 25; // fallback ~40 ms for 1 kHz, ~40 ms for 44.1 kHz/48 kHz
+    }
+
+    // packetBufferSize = samples in one packet (interleaved stereo)
+    packetBufferSize = framesPerPacket * CHANNEL_PER_FRAME;
+
+    // --------------------------------------------------------
 
     int64_t durationUs = avFormatContext->duration;
-    duration = static_cast<int>(durationUs / 1000);
+    duration = static_cast<int>(durationUs / 1000); // ms
 
-    LOGI("initAudioDecoder---->sampleRate:%1d---->packetBufferSize:%2d---->frame_size:%3d--->duration:%4d", sampleRate, packetBufferSize, avCodecContext->frame_size,duration);
-    //判断需不需要重采样
+    LOGI("initAudioDecoder---->sampleRate:%d---->packetBufferSize(samples):%d---->"
+         "frame_size:%d--->duration(ms):%lld",
+         sampleRate,
+         packetBufferSize,
+         avCodecContext->frame_size,
+         (long long)duration);
+
+    // resample if needed
     if (!audioCodecIsSupported()) {
-        swrContext = swr_alloc_set_opts(NULL,
-                                        AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16, sampleRate,
-                                        av_get_default_channel_layout(avCodecContext->channel_layout), avCodecContext->sample_fmt, sampleRate,
-                                        0, NULL);
+        swrContext = swr_alloc_set_opts(
+                NULL,
+                AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16, sampleRate,
+                av_get_default_channel_layout(avCodecContext->channel_layout),
+                avCodecContext->sample_fmt, sampleRate,
+                0, NULL);
         if (!swrContext || swr_init(swrContext)) {
             if (swrContext) {
                 swr_free(&swrContext);
@@ -93,27 +107,36 @@ int64_t AudioDecoder::getDuration() {
 }
 
 int AudioDecoder::getPacketBufferSize() {
+    // number of samples (shorts) per packet
     return packetBufferSize;
 }
 
 void AudioDecoder::prepare() {
     avPacket = av_packet_alloc();
-    avFrame = av_frame_alloc();
+    avFrame  = av_frame_alloc();
 }
 
 PcmFrame* AudioDecoder::decoderAudioPacket() {
-    audioDuration = 0;
+    audioDuration      = 0;
     audioStartPosition = 0;
+
+    // allocate one packet = packetBufferSize samples (interleaved)
     short *resample = new short[packetBufferSize];
+
+    // read up to packetBufferSize samples
     int stereoSampleSize = readSampleData(resample, packetBufferSize);
+
     PcmFrame *audioPacket = new PcmFrame();
     if (stereoSampleSize > 0) {
-        audioPacket->audioBuffer = resample;
-        audioPacket->audioSize = stereoSampleSize;
-        audioPacket->duration = audioDuration;
-        audioPacket->startPosition = audioStartPosition;
+        audioPacket->audioBuffer    = resample;
+        audioPacket->audioSize      = stereoSampleSize;
+        audioPacket->duration       = audioDuration;
+        audioPacket->startPosition  = audioStartPosition;
     } else {
-        audioPacket->audioSize = -1;
+        // no data, mark as EOF/error
+        delete[] resample;
+        audioPacket->audioBuffer = nullptr;
+        audioPacket->audioSize   = -1;
     }
     return audioPacket;
 }
@@ -124,12 +147,18 @@ void AudioDecoder::seek(const long seek_time) {
 }
 
 int AudioDecoder::readSampleData(short *samples, int size) {
+    // size is requested samples (interleaved)
     int realSamplesSize = size;
-    while (size > 0){
-        if(audioBufferCursor < audioBufferSize){
+    while (size > 0) {
+        if (audioBufferCursor < audioBufferSize) {
             int audioBufferDataSize = audioBufferSize - audioBufferCursor;
             int copySize = MIN(size, audioBufferDataSize);
-            memcpy(samples + (realSamplesSize - size), audioBuffer + audioBufferCursor, copySize * 2);
+
+            // copy short samples → multiply by 2 for bytes
+            memcpy(samples + (realSamplesSize - size),
+                   audioBuffer + audioBufferCursor,
+                   copySize * sizeof(short));
+
             size -= copySize;
             audioBufferCursor += copySize;
         } else {
@@ -139,7 +168,7 @@ int AudioDecoder::readSampleData(short *samples, int size) {
         }
     }
     int fillSize = realSamplesSize - size;
-    if(fillSize == 0){
+    if (fillSize == 0) {
         return -1;
     }
     return fillSize;
@@ -158,21 +187,28 @@ int AudioDecoder::readFrame() {
             } else {
                 int numChannels = av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
                 int numFrames = 0;
-                int size = av_samples_get_buffer_size(NULL, numChannels, avFrame->nb_samples * numChannels,AV_SAMPLE_FMT_S16, 1);
+                int size = av_samples_get_buffer_size(
+                        NULL,
+                        numChannels,
+                        avFrame->nb_samples * numChannels,
+                        AV_SAMPLE_FMT_S16,
+                        1);
                 uint8_t *resampleOutBuffer = (uint8_t *) malloc(size);
                 if (swrContext) {
-                    numFrames = swr_convert(swrContext,
-                                            &resampleOutBuffer, avFrame->nb_samples * numChannels,
-                                            (const u_int8_t **) avFrame->data, avFrame->nb_samples);
+                    numFrames = swr_convert(
+                            swrContext,
+                            &resampleOutBuffer, avFrame->nb_samples * numChannels,
+                            (const u_int8_t **) avFrame->data, avFrame->nb_samples);
                 } else {
                     resampleOutBuffer = *avFrame->data;
                     numFrames = avFrame->nb_samples;
                 }
-                audioBuffer =  (short*) resampleOutBuffer;
+                audioBuffer       = (short*) resampleOutBuffer;
                 audioBufferCursor = 0;
-                audioBufferSize = numFrames * numChannels;
+                audioBufferSize   = numFrames * numChannels;  // samples
+
                 audioDuration += av_frame_get_pkt_duration(avFrame) * time_base;
-                if(audioStartPosition == 0) {
+                if (audioStartPosition == 0) {
                     audioStartPosition = avFrame->pts * time_base;
                 }
             }
@@ -188,10 +224,9 @@ void AudioDecoder::seekFrame() {
     LOGI("seekFrame--start");
 
     if (time_seek >= 0 && audioStream != nullptr) {
-        // time_seek: milliseconds
-        // We convert ms → stream time_base
-        AVRational srcTimeBase = {1, 1000};                 // ms
-        AVRational dstTimeBase = audioStream->time_base;    // stream time_base
+        // time_seek: milliseconds → convert ms → stream time_base
+        AVRational srcTimeBase = {1, 1000};              // ms
+        AVRational dstTimeBase = audioStream->time_base; // stream time_base
 
         int64_t seek_pts = av_rescale_q(time_seek, srcTimeBase, dstTimeBase);
 
@@ -201,17 +236,18 @@ void AudioDecoder::seekFrame() {
                                 AVSEEK_FLAG_BACKWARD);
 
         if (ret < 0) {
-            LOGI("seekFrame-- failed! time_position=%f s", (double) time_seek / 1000.0);
+            LOGI("seekFrame-- failed! time_position=%f s",
+                 (double) time_seek / 1000.0);
         } else {
-            LOGI("seekFrame-- success, time_position=%f s", (double) time_seek / 1000.0);
+            LOGI("seekFrame-- success, time_position=%f s",
+                 (double) time_seek / 1000.0);
         }
 
-        // After seek, flush decoder buffers
+        // flush decoder buffers after seek
         if (avCodecContext) {
             avcodec_flush_buffers(avCodecContext);
         }
 
-        // Clear the pending seek
         time_seek = -1;
     }
 
@@ -219,10 +255,7 @@ void AudioDecoder::seekFrame() {
 }
 
 bool AudioDecoder::audioCodecIsSupported() {
-    if (avCodecContext->sample_fmt == AV_SAMPLE_FMT_S16) {
-        return true;
-    }
-    return false;
+    return avCodecContext->sample_fmt == AV_SAMPLE_FMT_S16;
 }
 
 void AudioDecoder::destroy() {
@@ -231,14 +264,12 @@ void AudioDecoder::destroy() {
         avCodecContext = nullptr;
     }
     if (avFormatContext) {
-        avformat_close_input(&avFormatContext);  // frees streams internally
+        avformat_close_input(&avFormatContext);
         avFormatContext = nullptr;
     }
-    // DO NOT free audioStream manually
     audioStream = nullptr;
 
-    // Clear other pointers
     swrContext = nullptr;
-    avPacket = nullptr;
-    avFrame = nullptr;
+    avPacket   = nullptr;
+    avFrame    = nullptr;
 }

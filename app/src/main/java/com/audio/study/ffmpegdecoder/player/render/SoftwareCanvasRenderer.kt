@@ -53,7 +53,6 @@ class SoftwareCanvasRenderer(
     }
 
     override fun renderFrame(buffer: ByteBuffer?, width: Int, height: Int) {
-        LogUtil.i(TAG, "renderFrame: ${width}x$height")
         if (buffer == null) return
         if (width <= 0 || height <= 0) return
 
@@ -73,7 +72,6 @@ class SoftwareCanvasRenderer(
 
             val viewW = surfaceView.width
             val viewH = surfaceView.height
-            LogUtil.i(TAG, "renderFrame: ${width}x$height")
             if (viewW == 0 || viewH == 0) {
                 return
             }

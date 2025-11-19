@@ -5,74 +5,62 @@
 #ifndef FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
 #define FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H
 
-
-#define QUEUE_SIZE_MAX_THRESHOLD 60
-#define QUEUE_SIZE_MIN_THRESHOLD 25
-
 #include "audio_decoder.h"
 #include <pthread.h>
 #include <queue>
 
 #define LOG_TAG "AudioDecoderControllerLog"
 
-class AudioDecoderController{
-    /** 伴奏的解码器 **/
+// So queue size in packets ~= queue time / 40ms.
+// 10 * 40ms ≈ 400ms, 4 * 40ms ≈ 160ms.
+#define QUEUE_SIZE_MAX_THRESHOLD 10
+#define QUEUE_SIZE_MIN_THRESHOLD 4
+
+class AudioDecoderController {
+
 private:
-    AudioDecoder *audioDecoder;
-    pthread_t audioDecoderThread;
+    AudioDecoder *audioDecoder = nullptr;
+    pthread_t     audioDecoderThread{};
     std::queue<PcmFrame *> audioFrameQueue;
-    bool isRunning;
-    pthread_mutex_t mLock;
-    pthread_cond_t mCondition;
-    // UI timeline: just where in the file this packet starts
+    bool          isRunning = false;
+    pthread_mutex_t mLock{};
+    pthread_cond_t  mCondition{};
+
     int64_t progressMs = 0;
 
-    // clock fields (all in ms)
-    int64_t audioClockStartMs   = 0;  // media time when current buffer started
-    int64_t audioClockUpdateMs  = 0;  // monotonic time when we last filled buffer
-    int     lastBufferDurationMs = 0; // duration of current buffer
+    // Clock fields (all ms) – used by getAudioClockMs()
+    int64_t audioClockStartMs    = 0; // media time when current buffer started
+    int64_t audioClockUpdateMs   = 0; // monotonic time when we last refilled
+    int     lastBufferDurationMs = 0; // duration of current buffer in ms
+
     int64_t seekTime = -1;
-    bool needSeek;
+    bool    needSeek = false;
 
-    static void *startDecoderThread(void *ptr);
+    bool visualizerEnabled = false;  // default: no visualizer
 
-    /** 开启解码线程 **/
-    virtual void initDecoderThread();
+    static void* startDecoderThread(void *ptr);
 
-    int decodeSongPacket();
-
-    /** 销毁解码线程 **/
-    virtual void destroyDecoderThread();
-
-    bool visualizerEnabled = false;  // default: no visual generation
+    void   initDecoderThread();
+    int    decodeSongPacket();
+    void   destroyDecoderThread();
 
 public:
-    int dataSize;
+    int dataSize = 0;
 
-    int getMusicMeta(const char *audioPath, int *metaArray);
+    AudioDecoderController() = default;
 
-    int prepare(const char *audioPath);
+    int      getMusicMeta(const char *audioPath, int *metaArray);
+    int      prepare(const char *audioPath);
+    void     seek(const long seek_time);
+    int64_t  getProgress();
+    int64_t  getAudioClockMs() const;
+    int      getChannels();
+    void     destroy();
+    int      readSamples(short *samples, int size);
 
-    void seek(const long seek_time);
-
-    int64_t getProgress();
-
-    int64_t getAudioClockMs() const;
-
-    int getChannels();
-
-    AudioDecoderController() {
-        needSeek = false;
-        seekTime = 0;
-    }
-
-    void destroy();
-
-    int readSamples(short *pInt, int i);
-
-    // turn visualization on/off
-    void setVisualizerEnabled(bool enabled);
-    bool isVisualizerEnabled() const;
+    // Visualizer on/off
+    void     setVisualizerEnabled(bool enabled);
+    bool     isVisualizerEnabled() const;
 };
 
 #endif //FFMPEGDECODER_MUSIC_DECODER_CORTROLLER_H

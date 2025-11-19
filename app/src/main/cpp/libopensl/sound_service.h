@@ -7,244 +7,185 @@
 
 #define PLAYING_STATE_STOPPED (0x00000001)
 #define PLAYING_STATE_PLAYING (0x00000002)
-#define PLAYING_STATE_PAUSE (0x00000003)
+#define PLAYING_STATE_PAUSE   (0x00000003)
 
 class SoundService {
 private:
-	SoundService(); //注意:构造方法私有
-	static SoundService* instance; //惟一实例
+    SoundService(); // private ctor
+    static SoundService* instance; // singleton
 
     int playingState = PLAYING_STATE_STOPPED;
-	//播放完成回调的时候需要用到的参数
-	JavaVM *g_jvm = nullptr;
-	jobject obj = nullptr;
 
-    static const int QUEUE_BUFFER_COUNT = 4;   // 队列里同时挂 4 个 buffer
+    // Java callback stuff
+    JavaVM *g_jvm = nullptr;
+    jobject obj   = nullptr;
 
-    // 用来给 OpenSL 播放的字节缓冲（多帧环形）
-    uint8_t* mBuffer = nullptr;               // 整块 buffer
-    int      mBufferNums = QUEUE_BUFFER_COUNT;// 帧数
-    int      mCurrentFrame = 0;               // 当前使用第几帧
-    int      mPacketBufferSize = 0;           // 每次 readSamples 的“样本数”（short 个数）
+    // ---- audio buffer / queue ----
+    static const int QUEUE_BUFFER_COUNT = 4;   // 4 buffers queued to OpenSL
 
-    // 解码出来的 PCM（short）临时缓冲（一个 packet）
+    // Multi-buffer ring for OpenSL (bytes)
+    uint8_t* mBuffer       = nullptr;          // whole ring buffer
+    int      mBufferNums   = QUEUE_BUFFER_COUNT;
+
+    // write index: where we write next PCM block
+    int      mCurrentFrame = 0;
+
+    // play index: which buffer OpenSL has just consumed
+    int      mPlayFrameIndex = 0;
+
+    // Per-buffer PCM frame count (for each queued buffer)
+    int      mFramesPerBuffer[QUEUE_BUFFER_COUNT] = {0};
+
+    // Per-packet PCM sample count (SHORTS, not bytes)
+    int      mPacketBufferSize = 0;
+
+    // Temporary PCM buffer used for readSamples (SHORTS)
     short*   mTarget = nullptr;
 
-    // 解码器元数据
-    long duration = 0;
+    // Decoder & metadata
+    long                    duration            = 0;
+    AudioDecoderController* decoderController   = nullptr;
+    int                     accompanySampleRate = 0;
 
-	//解码Mp3的解码的controller
-	AudioDecoderController* decoderController = nullptr;
-	//伴奏的采样频率
-	int accompanySampleRate = 0;
-
-	SLEngineItf engineEngine = nullptr;
-	SLObjectItf outputMixObject = nullptr;
-	SLObjectItf audioPlayerObject = nullptr;
-	SLAndroidSimpleBufferQueueItf audioPlayerBufferQueue = nullptr;
-	SLPlayItf audioPlayerPlay = nullptr;
-
-	int packetBufferSize = 0;
-	short* target = nullptr;
+    // OpenSL objects
+    SLEngineItf                   engineEngine            = nullptr;
+    SLObjectItf                   outputMixObject         = nullptr;
+    SLObjectItf                   audioPlayerObject       = nullptr;
+    SLAndroidSimpleBufferQueueItf audioPlayerBufferQueue  = nullptr;
+    SLPlayItf                     audioPlayerPlay         = nullptr;
 
     bool initedSoundTrack = false;
 
-	/**
-	 * Realize the given object. Objects needs to be
-	 * realized before using them.
-	 * @param object object instance.
-	 */
-	SLresult RealizeObject(SLObjectItf object) {
-		// Realize the engine object
-		return (*object)->Realize(object, SL_BOOLEAN_FALSE); // No async, blocking call
-	};
-	/**
-	 * Destroys the given object instance.
-	 * @param object object instance. [IN/OUT]
-	 */
-	void DestroyObject(SLObjectItf& object) {
-		if (0 != object)
-			(*object)->Destroy(object);
-		object = 0;
-	};
-	/**
-	 * Creates and output mix object.
-	 */
-	SLresult CreateOutputMix() {
+    // ---- audio clock based on CONSUMED frames ----
+    // frames actually played by the device
+    int64_t playedFrames   = 0;
+    // base PTS of this playback segment (0, or seek position, in ms)
+    int64_t audioBasePtsMs = 0;
+    bool    startPtsSet    = false;
+
+    pthread_mutex_t clockMutex = PTHREAD_MUTEX_INITIALIZER;
+
+    // helper: realize & destroy OpenSL objects
+    SLresult RealizeObject(SLObjectItf object) {
+        return (*object)->Realize(object, SL_BOOLEAN_FALSE);
+    }
+    void DestroyObject(SLObjectItf& object) {
+        if (object != nullptr) {
+            (*object)->Destroy(object);
+        }
+        object = nullptr;
+    }
+
+    // Create output mix
+    SLresult CreateOutputMix() {
         if (!engineEngine) return SL_RESULT_PRECONDITIONS_VIOLATED;
 
         SLresult result = (*engineEngine)->CreateOutputMix(
                 engineEngine, &outputMixObject, 0, nullptr, nullptr);
-
         if (result != SL_RESULT_SUCCESS) {
-            LOGE("CreateOutputMix failed: %d", result);
             return result;
         }
-
         return (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
-	};
-	/**
-	 * Free the player buffer.
-	 * @param buffers buffer instance. [OUT]
-	 */
-	void FreePlayerBuffer() {
-		if (NULL != target) {
-			delete[] target;
-			target = NULL;
-		}
-	};
-	/**
-	 * Initializes the player buffer.
-	 * @param buffers buffer instance. [OUT]
-	 * @param bufferSize buffer size. [OUT]
-	 */
-	void InitPlayerBuffer() {
-		//Initialize buffer
-		target = new short[packetBufferSize];
-	};
-	/**
-	 * Creates buffer queue audio player.
-	 */
-	SLresult CreateBufferQueueAudioPlayer() {
-		// Android simple buffer queue locator for the data source
-		SLDataLocator_AndroidSimpleBufferQueue dataSourceLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, // locator type
-				1 // buffer count
-				};
+    }
 
-		//PCM data source format
-//		SLDataFormat_PCM dataSourceFormat = { SL_DATAFORMAT_PCM, // format type
-//				2, // channel count
-//				accompanySampleRate, // samples per second in millihertz
-//				16, // bits per sample
-//				16, // container size
-//				SL_SPEAKER_FRONT_CENTER, // channel mask
-//				SL_BYTEORDER_LITTLEENDIAN // endianness
-//				};
+    // Create buffer queue audio player
+    SLresult CreateBufferQueueAudioPlayer();
 
-		uint samplesPerSec = opensl_get_sample_rate(accompanySampleRate);
-		SLDataFormat_PCM dataSourceFormat = { SL_DATAFORMAT_PCM, // format type
-				2, // channel count
-				samplesPerSec, // samples per second in millihertz
-				SL_PCMSAMPLEFORMAT_FIXED_16, // bits per sample
-				SL_PCMSAMPLEFORMAT_FIXED_16, // container size
-				SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT, // channel mask
-				SL_BYTEORDER_LITTLEENDIAN // endianness
-				};
+    // Get interfaces
+    SLresult GetAudioPlayerBufferQueueInterface() {
+        return (*audioPlayerObject)->GetInterface(
+                audioPlayerObject, SL_IID_BUFFERQUEUE, &audioPlayerBufferQueue);
+    }
+    SLresult GetAudioPlayerPlayInterface() {
+        return (*audioPlayerObject)->GetInterface(
+                audioPlayerObject, SL_IID_PLAY, &audioPlayerPlay);
+    }
 
-		// Data source is a simple buffer queue with PCM format
-		SLDataSource dataSource = { &dataSourceLocator, // data locator
-				&dataSourceFormat // data format
-				};
+    // Player states
+    SLresult SetAudioPlayerStatePlaying() {
+        return (*audioPlayerPlay)->SetPlayState(
+                audioPlayerPlay, SL_PLAYSTATE_PLAYING);
+    }
+    SLresult SetAudioPlayerStatePaused() {
+        return (*audioPlayerPlay)->SetPlayState(
+                audioPlayerPlay, SL_PLAYSTATE_PAUSED);
+    }
+    SLresult SetAudioPlayerStateStoped() {
+        return (*audioPlayerPlay)->SetPlayState(
+                audioPlayerPlay, SL_PLAYSTATE_STOPPED);
+    }
 
-		// Output mix locator for data sink
-		SLDataLocator_OutputMix dataSinkLocator = { SL_DATALOCATOR_OUTPUTMIX, // locator type
-				outputMixObject // output mix
-				};
+    // Buffer queue callback
+    static void PlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
+        SoundService* service = (SoundService*) context;
+        if (!service || !service->decoderController) {
+            return;
+        }
 
-		// Data sink is an output mix
-		SLDataSink dataSink = { &dataSinkLocator, // locator
-				0 // format
-				};
+        int frames   = 0;
+        int channels = service->decoderController->getChannels();
 
-		// Interfaces that are requested
-		SLInterfaceID interfaceIds[] = { SL_IID_BUFFERQUEUE };
+        // Index of the buffer that just finished playing
+        int playIndex = service->mPlayFrameIndex;
+        if (playIndex < 0 || playIndex >= QUEUE_BUFFER_COUNT) {
+            playIndex = 0;
+        }
 
-		// Required interfaces. If the required interfaces
-		// are not available the request will fail
-		SLboolean requiredInterfaces[] = { SL_BOOLEAN_TRUE // for SL_IID_BUFFERQUEUE
-				};
+        frames = service->mFramesPerBuffer[playIndex];
+        if (frames <= 0) {
+            // fallback: assume full packet size
+            frames = (channels > 0)
+                     ? (service->mPacketBufferSize / channels)
+                     : service->mPacketBufferSize;
+        }
 
-		// Create audio player object
-		return (*engineEngine)->CreateAudioPlayer(engineEngine, &audioPlayerObject, &dataSource, &dataSink, ARRAY_LEN(interfaceIds), interfaceIds, requiredInterfaces);
-	};
+        // update audio clock using "consumed frames"
+        service->onBufferConsumed(frames);
 
+        // advance play index (which buffer is next to be "finished" next time)
+        service->mPlayFrameIndex =
+                (service->mPlayFrameIndex + 1) % SoundService::QUEUE_BUFFER_COUNT;
 
-	/**
-	 * Gets the audio player buffer queue interface.
-	 */
-	SLresult GetAudioPlayerBufferQueueInterface() {
-		// Get the buffer queue interface
-		return (*audioPlayerObject)->GetInterface(audioPlayerObject, SL_IID_BUFFERQUEUE, &audioPlayerBufferQueue);
-	};
+        // enqueue next packet
+        service->producePacket();
+    }
 
-	/**
-	 * Gets called when a buffer finishes playing.
-	 */
-	static void PlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
-		SoundService* service = (SoundService*) context;
-		service->producePacket();
-	};
+    // Register callback
+    SLresult RegisterPlayerCallback();
 
-	/**
-	 * Registers the player callback.
-	 */
-	SLresult RegisterPlayerCallback();
-
-	SLresult RegisterSlientPlayerCallback();
-
-	/**
-	 * Gets the audio player play interface.
-	 */
-	SLresult GetAudioPlayerPlayInterface() {
-		// Get the play interface
-		return (*audioPlayerObject)->GetInterface(audioPlayerObject, SL_IID_PLAY, &audioPlayerPlay);
-	};
-
-	/**
-	 * Sets the audio player state playing.
-	 */
-	SLresult SetAudioPlayerStatePlaying() {
-		// Set audio player state to playing
-		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_PLAYING);
-	};
-
-	/**
-	 * Sets the audio player state paused.
-	 */
-	SLresult SetAudioPlayerStatePaused() {
-		// Set audio player state to paused
-		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_PAUSED);
-	};
-
-	SLresult SetAudioPlayerStateStoped() {
-		// Set audio player state to paused
-		return (*audioPlayerPlay)->SetPlayState(audioPlayerPlay, SL_PLAYSTATE_STOPPED);
-	};
+    // clock helpers
+    void setStartPtsMs(int64_t startPtsMs);
+    void onBufferConsumed(int bufferFrames);
 
 public:
-	static SoundService* GetInstance(); //工厂方法(用来获得实例)
-	virtual ~SoundService();
-	void setOnCompletionCallback(JavaVM *g_jvm, jobject obj);
+    static SoundService* GetInstance();
+    virtual ~SoundService();
 
-	bool initSongDecoder(const char* accompanyPath);
-	SLresult initSoundTrack();
-	int getAccompanySampleRate() {
-		return accompanySampleRate;
-	};
-	SLresult play();
-	SLresult stop();
-	SLresult pause();
-	SLresult resume();
+    void setOnCompletionCallback(JavaVM *g_jvm, jobject obj);
 
-	void seek(const long seek_time);
+    bool     initSongDecoder(const char* accompanyPath);
+    SLresult initSoundTrack();
+    int      getAccompanySampleRate() { return accompanySampleRate; }
 
-	void producePacket();
-	bool isPlaying();
+    SLresult play();
+    SLresult stop();
+    SLresult pause();
+    SLresult resume();
+
+    void seek(const long seek_time);
+
+    void producePacket();
+    bool isPlaying();
     int64_t getCurrentTimeMills();
-
     int64_t getAudioClockMs();
 
-	/**
-	 * Destroy the player context.
-	 */
-	void DestroyContext();
-	int getDurationTimeMills();
+    void DestroyContext();
+    int  getDurationTimeMills();
 
     void setVisualizerEnabled(bool enabled);
 
-	void callReady();
-
-	void callComplete();
-
+    void callReady();
+    void callComplete();
 };
-#endif	//_MEDIA_SOUND_SERVICE_
+
+#endif  // _MEDIA_SOUND_SERVICE_

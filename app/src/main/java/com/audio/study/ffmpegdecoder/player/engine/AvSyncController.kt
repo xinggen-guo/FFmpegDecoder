@@ -2,79 +2,74 @@ package com.audio.study.ffmpegdecoder.player.engine
 
 import com.audio.study.ffmpegdecoder.player.data.SyncDecision
 
+
 /**
- * @author xinggen.guo
- * @date 2025/11/17 14:42
- * Pure A/V sync brain (no rendering, no decode).
- * Uses audio as master clock.
  *
- * - Audio clock returned by AudioEngine is "time since start (or since seek)".
- * - We keep firstVideoPtsMs / firstAudioClockMs as local bases
- *   and only compare *relative* times.
+ * @author xinggen.guo
+ * @date 2025/11/17 15:06
+ * Pure A/V sync controller.
+ *
+ * Assumptions:
+ *  - videoPtsMs: absolute video PTS in milliseconds (from decoder/FFmpeg).
+ *  - audioClockMs: absolute audio clock in milliseconds (from AudioEngine / SoundService),
+ *    already aligned to the same timeline as video PTS.
+ *
+ * Audio is the master clock.
  */
 class AvSyncController(
-    private val maxLateMs: Long = 80L
+    /**
+     * How much video is allowed to be late (behind audio) before we drop the frame.
+     * e.g. 80ms means: if videoPts < audioClock - 80 => drop frame.
+     */
+    private val maxLateMs: Long = 80L,
+
+    /**
+     * How much video is allowed to be early (ahead of audio) before we sleep.
+     * e.g. 120ms means: if videoPts > audioClock + 120 => sleep a bit.
+     */
+    private val maxEarlyMs: Long = 120L
 ) {
-    private var firstVideoPtsMs: Long = -1L
-    private var firstAudioClockMs: Long = -1L
 
     fun reset() {
-        firstVideoPtsMs = -1L
-        firstAudioClockMs = -1L
+        // No internal state for now, but kept for future extension.
     }
 
     /**
-     * Called when player does a seek.
-     * Just treat it as a fresh start for sync:
-     * clear internal bases, next frames will re-anchor.
+     * Decide how to handle one video frame with the current audio clock.
      *
-     * Make sure AudioEngine also resets its clock at seek.
+     * @param videoPtsMs   absolute video PTS in ms.
+     * @param audioClockMs absolute audio clock in ms, or null if audio clock not ready yet.
      */
-    fun onSeek(targetMs: Long) {
-        // targetMs not strictly needed here, but kept for extensibility.
-        reset()
-    }
-
-    /**
-     * Decide how to sync one video frame with current audio clock.
-     *
-     * @param framePtsMs   absolute PTS (ms) of the video frame
-     * @param audioClockMs absolute audio clock (ms) from AudioEngine
-     */
-    fun decide(framePtsMs: Long, audioClockMs: Long?): SyncDecision {
-        // Establish video base
-        if (firstVideoPtsMs < 0) {
-            firstVideoPtsMs = framePtsMs
-        }
-        val videoTimeMs = framePtsMs - firstVideoPtsMs
-
-        // No audio clock yet → just draw
-        if (audioClockMs == null || audioClockMs <= 0) {
+    fun decide(videoPtsMs: Long, audioClockMs: Long?): SyncDecision {
+        // If we don't have a valid audio clock yet -> just render normally.
+        if (audioClockMs == null || audioClockMs <= 0L) {
             return SyncDecision(SyncDecision.Action.DRAW_NOW)
         }
 
-        // Establish audio base
-        if (firstAudioClockMs < 0) {
-            firstAudioClockMs = audioClockMs
-        }
-        val audioTimeMs = audioClockMs - firstAudioClockMs
-
-        val diff = videoTimeMs - audioTimeMs  // >0: video ahead, <0: video behind
+        val diff = videoPtsMs - audioClockMs
+        // diff > 0 : video ahead of audio
+        // diff < 0 : video behind audio
 
         return when {
-            // Video ahead → sleep but cap to avoid big stall
-            diff > 1 -> SyncDecision(
-                action = SyncDecision.Action.SLEEP_THEN_DRAW,
-                sleepMs = diff.coerceAtMost(40L)
-            )
+            // Video too early -> sleep a bit before drawing.
+            diff > maxEarlyMs -> {
+                SyncDecision(
+                    action = SyncDecision.Action.SLEEP_THEN_DRAW,
+                    sleepMs = diff.coerceAtMost(50L) // cap to avoid long stalls
+                )
+            }
 
-            // Video too late → drop
-            diff < -maxLateMs -> SyncDecision(
-                action = SyncDecision.Action.DROP_FRAME
-            )
+            // Video too late -> drop this frame and try the next.
+            diff < -maxLateMs -> {
+                SyncDecision(
+                    action = SyncDecision.Action.DROP_FRAME
+                )
+            }
 
-            // Small diff → draw now
-            else -> SyncDecision(SyncDecision.Action.DRAW_NOW)
+            // Small difference -> draw now.
+            else -> {
+                SyncDecision(SyncDecision.Action.DRAW_NOW)
+            }
         }
     }
 }

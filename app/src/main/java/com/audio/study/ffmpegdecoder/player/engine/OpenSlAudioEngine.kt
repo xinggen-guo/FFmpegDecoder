@@ -81,6 +81,8 @@ class OpenSlAudioEngine : AudioEngine {
     }
 
     override fun getAudioClockMs(): Long {
-        return nativeGetAudioClockMs()
+        val clock = nativeGetAudioClockMs();
+        LogUtil.d("OpenSlAudioEngine", "getAudioClockMs() = $clock")
+        return clock
     }
 }

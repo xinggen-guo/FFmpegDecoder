@@ -42,7 +42,7 @@ class XMediaPlayer(
         private const val PROGRESS_INTERVAL_MS = 200L
     }
 
-    private val syncController = AvSyncController(maxLateMs = 80L)
+    private val syncController = AvSyncController()
     private val mainHandler = Handler(Looper.getMainLooper())
 
     @Volatile private var prepared = false
@@ -157,7 +157,7 @@ class XMediaPlayer(
         videoEngine.seekTo(target)
 
         // 2) Reset sync controller
-        syncController.onSeek(target)
+        syncController.reset()
 
         // 3) For UI: immediately jump
         lastPositionMs = target
@@ -223,6 +223,7 @@ class XMediaPlayer(
             buffer?.clear()
             ptsOut[0] = 0L
 
+            val audioClock = audioEngine.getAudioClockMs().takeIf { it > 0 }
             val status = videoEngine.readFrameInto(buffer, ptsOut)
             val framePtsMs = ptsOut[0]
 
@@ -249,9 +250,8 @@ class XMediaPlayer(
                 }
             }
 
-            val audioClock = audioEngine.getAudioClockMs().takeIf { it > 0 }
-            val decision = syncController.decide(framePtsMs, audioClock)
 
+            val decision = syncController.decide(framePtsMs, audioClock)
             // Debug log every few frames or when needed
              LogUtil.i(TAG, "AV_SYNC videoPts=$framePtsMs audio=$audioClock decision=$decision")
 
@@ -283,7 +283,6 @@ class XMediaPlayer(
     private fun maybeDispatchProgress() {
         val now = System.currentTimeMillis()
         if (now - lastProgressCallbackTime >= PROGRESS_INTERVAL_MS) {
-            LogUtil.i("maybeDispatchProgress")
             lastProgressCallbackTime = now
             val pos = getCurrentPositionMs()
             mainHandler.post {

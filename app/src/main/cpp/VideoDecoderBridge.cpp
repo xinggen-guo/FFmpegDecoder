@@ -32,7 +32,7 @@ Java_com_audio_study_ffmpegdecoder_video_VideoPlayer_nativeOpenVideo(
 
     env->ReleaseStringUTFChars(path_, path);
 
-    if (ret != 0) {
+    if (ret != MEDIA_STATUS_OK) {
         delete gVideoController;
         gVideoController = nullptr;
         return JNI_FALSE;

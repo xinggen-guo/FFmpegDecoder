@@ -84,7 +84,6 @@ class XMediaPlayerActivity : AppCompatActivity() {
             }
 
             override fun onProgress(positionMs: Long) {
-                LogUtil.i("onProgress--durationMs:$durationMs--positionMs:$positionMs")
                 if (!isUserSeeking && durationMs > 0) {
                     binding.seekBar.progress = positionMs.toInt()
                     binding.txtCurrent.text = formatMillisecond(positionMs)

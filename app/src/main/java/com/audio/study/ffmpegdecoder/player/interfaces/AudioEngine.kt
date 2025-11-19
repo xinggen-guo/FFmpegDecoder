@@ -21,8 +21,8 @@ interface AudioEngine {
     fun getDurationMs(): Long
 
     /**
-     * Current audio playback clock in ms.
-     * This is the MASTER clock for A/V sync.
+     * Master clock in **media milliseconds**, based on CONSUMED samples.
+     * XMediaPlayer will call this for A/V sync.
      */
     fun getAudioClockMs(): Long
 }
