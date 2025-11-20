@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:padding="24dp">
+	
+	<TextView
+		android:id="@+id/tvTitle"
+		android:layout_width="0dp"
+		android:layout_height="wrap_content"
+		android:text="Live Audio Loopback"
+		android:textSize="20sp"
+		android:textStyle="bold"
+		android:gravity="center_horizontal"
+		app:layout_constraintTop_toTopOf="parent"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"/>
+	
+	<TextView
+		android:id="@+id/tvStatus"
+		android:layout_width="0dp"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="16dp"
+		android:text="Status: Idle"
+		android:textSize="14sp"
+		app:layout_constraintTop_toBottomOf="@id/tvTitle"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"/>
+	
+	<TextView
+		android:id="@+id/tvLevelTitle"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="Input Level:"
+		android:layout_marginTop="32dp"
+		app:layout_constraintTop_toBottomOf="@id/tvStatus"
+		app:layout_constraintStart_toStartOf="parent"/>
+	
+	<ProgressBar
+		android:id="@+id/progressLevel"
+		style="?android:attr/progressBarStyleHorizontal"
+		android:layout_width="0dp"
+		android:layout_height="16dp"
+		android:max="100"
+		app:layout_constraintTop_toBottomOf="@id/tvLevelTitle"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent"/>
+	
+	<LinearLayout
+		android:id="@+id/buttonRow"
+		android:layout_width="0dp"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="40dp"
+		android:gravity="center"
+		android:orientation="horizontal"
+		app:layout_constraintTop_toBottomOf="@id/progressLevel"
+		app:layout_constraintStart_toStartOf="parent"
+		app:layout_constraintEnd_toEndOf="parent">
+		
+		<Button
+			android:id="@+id/btnStart"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="Start"/>
+		
+		<Space
+			android:layout_width="16dp"
+			android:layout_height="0dp"/>
+		
+		<Button
+			android:id="@+id/btnStop"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="Stop"/>
+	</LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

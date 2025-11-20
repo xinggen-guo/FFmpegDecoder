@@ -28,6 +28,15 @@
     } while (0)
 #define SAFE_DELETE_ARRAY(p) { if (p) { delete[] (p); (p) = nullptr; } }
 
+
+#define CHECK_SL_OK(op) \
+    do { \
+        SLresult _res = (op); \
+        if (_res != SL_RESULT_SUCCESS) { \
+            /* you can add logging here if you have a C++ log util */ \
+        } \
+    } while (0)
+
 static long long GetSysCurrentTime()
 {
     struct timeval time;
