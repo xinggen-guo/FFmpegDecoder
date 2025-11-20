@@ -1,5 +1,6 @@
 package com.audio.study.ffmpegdecoder.player.engine
 
+import android.view.Surface
 import com.audio.study.ffmpegdecoder.common.MediaStatus
 import com.audio.study.ffmpegdecoder.player.enum.DecodeType
 import com.audio.study.ffmpegdecoder.player.interfaces.VideoEngine
@@ -116,5 +117,9 @@ class FfmpegVideoEngine : VideoEngine {
         // Optionally log:
          LogUtil.d(TAG, "readFrameInto -> status=$status pts=${ptsOut[0]}")
         return status
+    }
+
+    override fun setOutputSurface(surface: Surface?) {
+       // do nothing
     }
 }

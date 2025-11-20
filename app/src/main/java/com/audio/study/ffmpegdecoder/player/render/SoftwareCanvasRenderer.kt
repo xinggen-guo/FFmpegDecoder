@@ -5,9 +5,11 @@ import android.graphics.Rect
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.ViewGroup
 import com.audio.study.ffmpegdecoder.player.interfaces.VideoRenderer
 import com.audio.study.ffmpegdecoder.utils.LogUtil
 import java.nio.ByteBuffer
+
 
 /**
  * @author xinggen.guo
@@ -50,6 +52,12 @@ class SoftwareCanvasRenderer(
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             srcRect.set(0, 0, width, height)
         }
+
+        val params: ViewGroup.LayoutParams = surfaceView.getLayoutParams()
+        params.width = width // In pixels
+        params.height = height // In pixels
+        surfaceView.setLayoutParams(params)
+
     }
 
     override fun renderFrame(buffer: ByteBuffer?, width: Int, height: Int) {
@@ -96,5 +104,9 @@ class SoftwareCanvasRenderer(
         } finally {
             holder.unlockCanvasAndPost(canvas)
         }
+    }
+
+    override fun surfaceChanged(surface: Surface?, format: Int, width: Int, height: Int) {
+
     }
 }

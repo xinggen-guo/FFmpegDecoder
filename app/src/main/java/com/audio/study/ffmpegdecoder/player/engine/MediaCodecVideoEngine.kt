@@ -11,6 +11,7 @@ import com.audio.study.ffmpegdecoder.utils.LogUtil
 import java.io.IOException
 import java.nio.ByteBuffer
 
+
 /**
  * @author xinggen.guo
  * @date 2025/11/17 15:37
@@ -24,8 +25,7 @@ import java.nio.ByteBuffer
  *      * release output buffers with render=true
  *      * return PTS (ms) for the displayed frame
  *
- * For this engine,should use a VideoRenderer that does nothing or only
- * manages the Surface (e.g. SurfaceOnlyRenderer).
+ * For this engine, should use a VideoRenderer that only manages the Surface.
  */
 class MediaCodecVideoEngine : VideoEngine {
 
@@ -51,11 +51,12 @@ class MediaCodecVideoEngine : VideoEngine {
     @Volatile
     private var prepared = false
 
-    fun setOutputSurface(surface: Surface?) {
-        LogUtil.i(TAG, "setOutputSurface: $surface")
-        outputSurface = surface
-        // If codec already configured and running, normally can't change surface
-        // without recreating codec. So set this before prepare() in practice.
+    @Volatile
+    private var started = false      // NEW: codec.start() state
+
+    override fun setOutputSurface(surface: Surface?) {
+        LogUtil.i(TAG, "setOutPutSurface: $surface")
+       outputSurface = surface
     }
 
     override fun prepare(path: String): Boolean {
@@ -98,8 +99,8 @@ class MediaCodecVideoEngine : VideoEngine {
         extractor.selectTrack(videoTrackIdx)
         trackIndex = videoTrackIdx
 
-        width = videoFormat.getInteger(MediaFormat.KEY_WIDTH)
-        height = videoFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        // use helper (handles crop + rotation)
+        updateSizeFromFormat(videoFormat)
 
         durationMs = if (videoFormat.containsKey(MediaFormat.KEY_DURATION)) {
             videoFormat.getLong(MediaFormat.KEY_DURATION) / 1000L
@@ -133,47 +134,73 @@ class MediaCodecVideoEngine : VideoEngine {
 
         return true
     }
-
     override fun start() {
         if (!prepared) {
             LogUtil.w(TAG, "start() called before prepare()")
             return
         }
-        codec?.start()
-        LogUtil.i(TAG, "MediaCodec started")
+        if (started) {
+            // XMediaPlayer may call play() again (after EOF + seek),
+            // but codec was already started → ignore, like FFmpeg path.
+            LogUtil.d(TAG, "start() ignored, codec already started")
+            return
+        }
+
+        try {
+            codec?.start()
+            started = true
+            inputEOS = false
+            outputEOS = false
+            LogUtil.i(TAG, "MediaCodec started")
+        } catch (e: IllegalStateException) {
+            LogUtil.e(TAG, "codec.start() failed: ${e.message}")
+        }
     }
 
     override fun pause() {
-        // For MediaCodec, we don't have an easy built-in pause.
-        // XMediaPlayer's render loop checks playing flag before calling readFrameInto,
-        // so we can simply not decode frames while paused.
-        LogUtil.i(TAG, "pause() - no-op (handled by upper layer)")
+        // Pause is handled by XMediaPlayer (it just stops calling readFrameInto()).
+        LogUtil.i(TAG, "pause() - no-op (handled by XMediaPlayer)")
     }
 
     override fun resume() {
-        LogUtil.i(TAG, "resume() - no-op (handled by upper layer)")
+        LogUtil.i(TAG, "resume() - no-op (handled by XMediaPlayer)")
     }
 
     override fun seekTo(positionMs: Long) {
         val extractor = this.extractor ?: return
         val codec = this.codec ?: return
-
+        if (!prepared) return
         LogUtil.i(TAG, "seekTo: $positionMs ms")
 
-        // Flush codec + reposition extractor
-        codec.flush()
-        extractor.seekTo(positionMs * 1000, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
-
+        if(inputEOS || outputEOS){
+            codec.flush()
+        }
+        // Reset EOS state so decoding can continue after seek (including after EOF)
         inputEOS = false
         outputEOS = false
+
+        // Reposition extractor
+        extractor.seekTo(positionMs * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
     }
 
     override fun release() {
         LogUtil.i(TAG, "release")
+        releaseInternal()
+        outputSurface = null
+        prepared = false
+        started = false
+        inputEOS = false
+        outputEOS = false
+    }
+
+    private fun releaseInternal() {
         try {
-            codec?.stop()
+            if (started) {
+                codec?.stop()
+            }
         } catch (_: Exception) {
         }
+
         try {
             codec?.release()
         } catch (_: Exception) {
@@ -186,10 +213,7 @@ class MediaCodecVideoEngine : VideoEngine {
         }
         extractor = null
 
-        outputSurface = null
-        prepared = false
-        inputEOS = false
-        outputEOS = false
+        started = false
     }
 
     override fun getVideoSize(): Pair<Int, Int> = width to height
@@ -197,19 +221,33 @@ class MediaCodecVideoEngine : VideoEngine {
     override fun readFrameInto(buffer: ByteBuffer?, ptsOut: LongArray): Int {
         val extractor = this.extractor ?: return MediaStatus.ERROR
         val codec = this.codec ?: return MediaStatus.ERROR
+
+        if (!started) {
+            LogUtil.w(TAG, "readFrameInto() called before codec started")
+            return MediaStatus.BUFFERING
+        }
+
         if (outputEOS) {
             return MediaStatus.EOF
         }
 
-        // 1) Feed input if possible
+        // 1) Feed input to MediaCodec
         if (!inputEOS) {
-            val inIndex = codec.dequeueInputBuffer(0)
+            val inIndex = try {
+                codec.dequeueInputBuffer(0)
+            } catch (e: IllegalStateException) {
+                LogUtil.e(TAG, "dequeueInputBuffer failed: ${e.message}")
+                return MediaStatus.ERROR
+            }
+
             if (inIndex >= 0) {
                 val inputBuffer = codec.getInputBuffer(inIndex)
                 if (inputBuffer != null) {
+                    inputBuffer.clear()
                     val sampleSize = extractor.readSampleData(inputBuffer, 0)
                     if (sampleSize < 0) {
-                        // No more samples
+                        // No more samples -> send EOS to codec
+                        LogUtil.d(TAG, "readFrameInto: input EOS")
                         codec.queueInputBuffer(
                             inIndex,
                             0,
@@ -233,21 +271,28 @@ class MediaCodecVideoEngine : VideoEngine {
             }
         }
 
-        // 2) Dequeue output
+        // 2) Dequeue output from MediaCodec
         val info = MediaCodec.BufferInfo()
-        val outIndex = codec.dequeueOutputBuffer(info, 0)
+        val outIndex = try {
+            codec.dequeueOutputBuffer(info, 0)
+        } catch (e: IllegalStateException) {
+            LogUtil.e(TAG, "dequeueOutputBuffer failed: ${e.message}")
+            return MediaStatus.ERROR
+        }
 
         return when {
             outIndex >= 0 -> {
                 val isEOS = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
                 val ptsMs = info.presentationTimeUs / 1000L
 
-                // Render to surface
+                // Render to Surface
                 codec.releaseOutputBuffer(outIndex, true)
 
                 if (ptsOut.isNotEmpty()) {
                     ptsOut[0] = ptsMs
                 }
+
+                LogUtil.d(TAG, "readFrameInto: OK pts=$ptsMs, eos=$isEOS")
 
                 if (isEOS) {
                     outputEOS = true
@@ -259,21 +304,64 @@ class MediaCodecVideoEngine : VideoEngine {
 
             outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                 val newFormat = codec.outputFormat
-                width = newFormat.getInteger(MediaFormat.KEY_WIDTH)
-                height = newFormat.getInteger(MediaFormat.KEY_HEIGHT)
-                LogUtil.i(TAG, "INFO_OUTPUT_FORMAT_CHANGED: new size ${width}x$height")
+                updateSizeFromFormat(newFormat)
+                LogUtil.i(
+                    TAG,
+                    "INFO_OUTPUT_FORMAT_CHANGED -> new display size ${width}x$height"
+                )
                 MediaStatus.BUFFERING
             }
 
             outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                // No output ready yet
+                // No frame ready this time
+                // Avoid busy loop: small sleep is handled by XMediaPlayer (it sleeps on BUFFERING)
                 MediaStatus.BUFFERING
             }
 
             else -> {
-                // Unexpected status
+                LogUtil.e(TAG, "readFrameInto: unexpected outIndex=$outIndex")
                 MediaStatus.ERROR
             }
         }
+    }
+    private fun updateSizeFromFormat(format: MediaFormat) {
+        var w = format.getInteger(MediaFormat.KEY_WIDTH)
+        var h = format.getInteger(MediaFormat.KEY_HEIGHT)
+
+        // --- handle crop rect if present (real visible size) ---
+        val hasCrop =
+            format.containsKey("crop-right") &&
+                    format.containsKey("crop-left") &&
+                    format.containsKey("crop-bottom") &&
+                    format.containsKey("crop-top")
+
+        if (hasCrop) {
+            val cropRight  = format.getInteger("crop-right")
+            val cropLeft   = format.getInteger("crop-left")
+            val cropBottom = format.getInteger("crop-bottom")
+            val cropTop    = format.getInteger("crop-top")
+
+            w = cropRight - cropLeft + 1
+            h = cropBottom - cropTop + 1
+        }
+
+        // --- handle rotation: 90/270 -> swap width & height for display ---
+        var rotation = 0
+        if (format.containsKey("rotation-degrees")) {
+            rotation = format.getInteger("rotation-degrees")
+        }
+
+        if (rotation == 90 || rotation == 270) {
+            val tmp = w
+            w = h
+            h = tmp
+        }
+
+        width = w
+        height = h
+        LogUtil.i(
+            TAG,
+            "updateSizeFromFormat -> display size=${width}x$height, rotation=$rotation, hasCrop=$hasCrop"
+        )
     }
 }

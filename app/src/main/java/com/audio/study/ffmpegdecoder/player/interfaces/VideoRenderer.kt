@@ -24,4 +24,5 @@ interface VideoRenderer {
      * may do nothing (MediaCodec already rendered to Surface).
      */
     fun renderFrame(buffer: ByteBuffer?, width: Int, height: Int)
+    fun surfaceChanged(surface: Surface?, format: Int, width: Int, height: Int)
 }

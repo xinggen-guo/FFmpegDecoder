@@ -1,5 +1,6 @@
 package com.audio.study.ffmpegdecoder.player.interfaces
 
+import android.view.Surface
 import com.audio.study.ffmpegdecoder.player.enum.DecodeType
 import java.nio.ByteBuffer
 
@@ -39,4 +40,5 @@ interface VideoEngine {
      * Returns one of MediaStatus.* values.
      */
     fun readFrameInto(buffer: ByteBuffer?, ptsOut: LongArray): Int
+    fun setOutputSurface(surface: Surface?)
 }

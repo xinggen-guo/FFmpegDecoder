@@ -43,8 +43,8 @@ class XMediaPlayerActivity : AppCompatActivity() {
 
         val renderer = SoftwareCanvasRenderer(binding.surfaceView)
         val audioEngine: AudioEngine = OpenSlAudioEngine()
-        val videoEngine: VideoEngine = FfmpegVideoEngine()
-//        val videoEngine: VideoEngine = MediaCodecVideoEngine()
+//        val videoEngine: VideoEngine = FfmpegVideoEngine()
+        val videoEngine: VideoEngine = MediaCodecVideoEngine()
         xPlayer = XMediaPlayer(audioEngine, videoEngine, renderer)
 
         // Surface is technically not needed by SoftwareCanvasRenderer,
@@ -59,7 +59,9 @@ class XMediaPlayerActivity : AppCompatActivity() {
                 format: Int,
                 width: Int,
                 height: Int
-            ) = Unit
+            ) {
+                xPlayer.surfaceChanged(holder.surface, format, width, height)
+            }
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
                 // optional: pause/stop

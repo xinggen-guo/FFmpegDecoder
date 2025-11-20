@@ -66,6 +66,12 @@ class XMediaPlayer(
     /** Set or update output surface (SurfaceView / TextureView / SurfaceTexture). */
     fun setSurface(surface: Surface?) {
         videoRenderer.setSurface(surface)
+        videoEngine.setOutputSurface(surface)
+    }
+
+    fun surfaceChanged(surface: Surface?, format: Int, width: Int, height: Int) {
+        videoRenderer.surfaceChanged(surface, format, width, height)
+        videoEngine.setOutputSurface(surface)
     }
 
     fun isPlayerCompleted(): Boolean = reachedEof
@@ -443,7 +449,7 @@ class XMediaPlayer(
         val target = previewPositionMs
         previewRequested = false
 
-        if (buffer == null) {
+        if (buffer == null && videoEngine.decodeType == DecodeType.FFMPEG) {
             Thread.sleep(10)
             return
         }
@@ -453,9 +459,10 @@ class XMediaPlayer(
         // Video-only seek; audio engine already paused in beginSeekPreview().
         videoEngine.seekTo(target)
 
-        buffer.clear()
+        buffer?.clear()
         ptsOut[0] = 0L
         val status = videoEngine.readFrameInto(buffer, ptsOut)
+        videoRenderer.renderFrame(frameBuffer, w, h)
         val framePtsMs = ptsOut[0]
 
         when (status) {
@@ -510,4 +517,5 @@ class XMediaPlayer(
             listener?.onEndResume()
         }
     }
+
 }
