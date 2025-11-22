@@ -11,7 +11,8 @@ import com.audio.study.ffmpegdecoder.audiotracke.AudioDecoderImpl
 import com.audio.study.ffmpegdecoder.databinding.ActivityLiveAudioBinding
 import com.audio.study.ffmpegdecoder.live.engine.OpenSlLiveAudioEngine
 import com.audio.study.ffmpegdecoder.utils.FileUtil
-import kotlin.math.min
+import com.audio.study.ffmpegdecoder.utils.WavWriter
+import java.io.File
 
 class LiveAudioActivity : ComponentActivity() {
 
@@ -20,15 +21,27 @@ class LiveAudioActivity : ComponentActivity() {
     private val liveEngine = OpenSlLiveAudioEngine()
     private val bgmDecoder = AudioDecoderImpl()
 
+    // --- WAV recording state ---
+
+    private var wavWriter: WavWriter? = null
+
+    private var totalPcmBytes: Long = 0
+
+    private val recordSampleRate = 44100
+    private val recordChannels = 1
+    private val recordBitsPerSample = 16
+
     // make it nullable, because FileUtil may return null / empty
     private var bgmPath: String? = null
 
     // BGM ring buffer: stereo (L/R interleaved), ~4s @ 44.1k
-    private val bgmRing = ShortArray(44100 * 4)   // 4 seconds * 1ch? we store shorts, but we treat as stereo frames
-    private var bgmWrite = 0
-    private var bgmRead = 0
-    private var bgmCount = 0                     // number of valid shorts in ring
+    // 4 seconds * 1ch? we store shorts, but we treat as stereo frames
+    private val bgmRing = ShortArray(44100 * 4)
+    private var bgmReadPos = 0          // index to read from (short index)
+    private var bgmWritePos = 0         // index to write to
+    private var bgmCount = 0            // how many valid *shorts* in ring
 
+    // number of valid shorts in ring
     private var micGain: Float = 0.8f   // default 80%
     private var bgmGain: Float = 0.6f   // default 60%
 
@@ -61,7 +74,7 @@ class LiveAudioActivity : ComponentActivity() {
             bgmPath = path
 
             val metaArray = intArrayOf(0, 0, 0)
-            bgmDecoder.getMusicMetaByPath(path,metaArray)
+            bgmDecoder.getMusicMetaByPath(path, metaArray)
 
             binding.tvStatus.text = if (!path.isNullOrEmpty()) {
                 "BGM: $path"
@@ -132,12 +145,15 @@ class LiveAudioActivity : ComponentActivity() {
         liveEngine.setSpeakerMonitorEnabled(true)
 
         // 1) live engine
-        val ok = liveEngine.prepare(sampleRate = 44100, channels = 1, bufferMs = 20)
+        val ok = liveEngine.prepare(
+            sampleRate = recordSampleRate,
+            channels = recordChannels,
+            bufferMs = 20
+        )
         if (!ok) {
             binding.tvStatus.text = "Status: init failed"
             return
         }
-
 
 
         // 2) BGM decoder
@@ -147,47 +163,72 @@ class LiveAudioActivity : ComponentActivity() {
             return
         }
 
+        try {
+            val output = File(FileUtil.getFileExternalCachePath(this), "mixed_record_${System.currentTimeMillis()}.wav")
+            wavWriter = WavWriter(output, recordSampleRate, recordChannels, recordBitsPerSample)
+            wavWriter?.start()
+
+            binding.tvStatus.text = "Recording PCM to: ${output?.absolutePath}"
+        } catch (e: Exception) {
+            binding.tvStatus.text = "Failed to open PCM file: ${e.message}"
+        }
+
         // Optional: user of mixed PCM (recording / streaming)
         liveEngine.setOnMixedPcm { mixedPcm, size ->
             // TODO: send over network / save file, etc.
         }
 
         // 3) MIC callback – we do ALL mixing here
+        // 3) MIC callback – ALL mixing here
         liveEngine.setOnPcmCaptured { micPcm, micSize ->
-            // micSize = number of mono samples from mic (44.1kHz, ~20ms)
-            val micFrames = micSize
-            val neededBgmShorts = micFrames * 2   // stereo: L+R per frame
+            // micSize: mono samples (44.1kHz, ~20ms)
 
-            // 1) Make sure ring buffer has enough BGM for this callback
+            val micFrames = micSize                           // 1 frame = 1 mono sample
+            val neededBgmShorts = micFrames * 2               // BGM is stereo → need L+R per frame
+
+            // ----------------------------------------------------------
+            // 1) Ensure ring buffer has enough BGM samples for this callback
+            // ----------------------------------------------------------
             while (bgmCount < neededBgmShorts) {
-                val read = bgmDecoder.readSamples(bgmTemp)
-                if (read <= 0) break          // EOF or no more data
-                pushBgmToRing(bgmTemp, read)
+                val read = bgmDecoder.readSamples(bgmTemp)    // bgmTemp also contains stereo PCM
+                if (read <= 0) break                          // EOF or read error
+                pushBgmToRing(bgmTemp, read)                  // push into stereo ring buffer
             }
 
             val framesToMix = micFrames
 
-            // 2) Mix mic + BGM (1 BGM frame per mic frame → correct speed)
+            // ----------------------------------------------------------
+            // 2) Mix MIC (mono) + BGM (stereo → mono)
+            //    Correct speed: 1 BGM frame per 1 mic frame.
+            // ----------------------------------------------------------
             for (i in 0 until framesToMix) {
                 val mic = micPcm[i].toInt()
 
                 val bgmMono = if (bgmCount >= 2) {
-                    popBgmFrame()
+                    popBgmFrame()                             // returns (L+R)/2 as mono
                 } else {
-                    0
+                    0                                         // BGM not ready → silent
                 }
 
-                val mixed = (mic * this.micGain + bgmMono * this.bgmGain).toInt()
+                // apply gain
+                val mixed = (mic * micGain + bgmMono * bgmGain).toInt()
                 mixedBuffer[i] = mixed
                     .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                     .toShort()
             }
 
-            // 3) Send mixed PCM out
+            // ----------------------------------------------------------
+            // 3) Send mixed PCM to user listener + speaker
+            // ----------------------------------------------------------
             liveEngine.dispatchMixedPcm(mixedBuffer, framesToMix)
+
+            wavWriter?.writeSamples(mixedBuffer, framesToMix)
+
             liveEngine.pushMixedPcmToSpeaker(mixedBuffer, framesToMix)
 
-            // 4) UI level from mixed signal
+            // ----------------------------------------------------------
+            // 4) Update UI level using the mixed signal
+            // ----------------------------------------------------------
             var sum = 0L
             for (i in 0 until framesToMix) {
                 val v = mixedBuffer[i].toInt()
@@ -212,7 +253,13 @@ class LiveAudioActivity : ComponentActivity() {
         liveEngine.stopLoopback()
         liveEngine.release()
 
-        binding.tvStatus.text = "Status: stopped"
+        binding.tvStatus.text = "Status: ${wavWriter?.getFilePath()}"
+        // --- close PCM stream ---
+        wavWriter?.stop()
+        wavWriter = null
+
+        totalPcmBytes = 0L
+
         binding.progressLevel.progress = 0
     }
 
@@ -223,57 +270,42 @@ class LiveAudioActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    /**
-     * Push `count` shorts from src into the BGM ring buffer.
-     * If there is not enough space, we drop the oldest samples.
-     */
-    private fun pushBgmToRing(src: ShortArray, count: Int) {
-        if (count <= 0) return
+    // --------------------------------------------------------------
+    // pushBgmToRing: append `size` shorts from decoder into ring
+    // --------------------------------------------------------------
+    private fun pushBgmToRing(src: ShortArray, size: Int) {
+        val n = size.coerceAtMost(src.size)
+        val cap = bgmRing.size
 
-        // we only keep at most ring.size shorts
-        var toWrite = count.coerceAtMost(bgmRing.size)
+        for (i in 0 until n) {
+            bgmRing[bgmWritePos] = src[i]
+            bgmWritePos = (bgmWritePos + 1) % cap
 
-        val free = bgmRing.size - bgmCount
-        if (toWrite > free) {
-            // no space → drop the oldest data
-            val drop = toWrite - free
-            bgmRead = (bgmRead + drop) % bgmRing.size
-            bgmCount -= drop
+            if (bgmCount < cap) {
+                bgmCount++
+            } else {
+                // full → drop oldest one short
+                bgmReadPos = (bgmReadPos + 1) % cap
+            }
         }
-
-        var remaining = toWrite
-        var srcIndex = count - toWrite   // keep the newest part
-
-        while (remaining > 0) {
-            val chunk = min(remaining, bgmRing.size - bgmWrite)
-            src.copyInto(
-                destination = bgmRing,
-                destinationOffset = bgmWrite,
-                startIndex = srcIndex,
-                endIndex = srcIndex + chunk
-            )
-            bgmWrite = (bgmWrite + chunk) % bgmRing.size
-            srcIndex += chunk
-            remaining -= chunk
-        }
-
-        bgmCount += toWrite
     }
 
     /**
-     * Pop one *frame* of BGM (stereo → mono).
+     * Pop one *frame* of BGM (stereo -> mono).
      * Returns mono sample (L+R)/2, or 0 if not enough data.
      */
     private fun popBgmFrame(): Int {
+        // need at least L + R
         if (bgmCount < 2) return 0
 
-        val l = bgmRing[bgmRead].toInt()
-        val rIndex = (bgmRead + 1) % bgmRing.size
-        val r = bgmRing[rIndex].toInt()
+        val cap = bgmRing.size
+        val L = bgmRing[bgmReadPos].toInt()
+        val R = bgmRing[(bgmReadPos + 1) % cap].toInt()
 
-        bgmRead = (bgmRead + 2) % bgmRing.size
+        bgmReadPos = (bgmReadPos + 2) % cap
         bgmCount -= 2
 
-        return (l + r) / 2
+        return (L + R) / 2      // stereo -> mono
     }
+
 }
