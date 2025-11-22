@@ -21,11 +21,12 @@ Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_getMusicMeta(JNI
 }
 
 extern "C"
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_audio_study_ffmpegdecoder_audiotracke_AudioDecoderImpl_prepareDecoder(JNIEnv *env, jobject thiz, jstring music_path) {
     const char *audioPath = env->GetStringUTFChars(music_path, NULL);
     audioDecoderController = new AudioDecoderController();
-    audioDecoderController->prepare(audioPath);
+    int result = audioDecoderController->prepare(audioPath);
+    return result == 0;
 }
 
 extern "C"

@@ -76,5 +76,52 @@
 			android:layout_weight="1"
 			android:text="Stop"/>
 	</LinearLayout>
+	
+	<Button
+		android:id="@+id/btnSetBgmPath"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		app:layout_constraintTop_toBottomOf="@id/buttonRow"
+		android:text="Set the BGM path"/>
+	
+	<LinearLayout
+		android:id="@+id/layoutGains"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		app:layout_constraintTop_toBottomOf="@id/btnSetBgmPath"
+		android:padding="8dp">
+		
+		<!-- Mic Gain -->
+		<TextView
+			android:id="@+id/tvMicGainLabel"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="Mic Gain: 80%"
+			android:textSize="14sp" />
+		
+		<SeekBar
+			android:id="@+id/seekMicGain"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:max="100"
+			android:progress="80" />
+		
+		<!-- BGM Gain -->
+		<TextView
+			android:id="@+id/tvBgmGainLabel"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="8dp"
+			android:text="BGM Gain: 60%"
+			android:textSize="14sp" />
+		
+		<SeekBar
+			android:id="@+id/seekBgmGain"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:max="100"
+			android:progress="60" />
+	</LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

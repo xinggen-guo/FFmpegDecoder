@@ -34,6 +34,12 @@ class OpenSlLiveAudioEngine : LiveAudioEngine {
 
     private var pcmListener: ((ShortArray, Int) -> Unit)? = null
 
+    var onMixedPcmListener: ((ShortArray, Int) -> Unit)? = null
+
+    @Volatile
+    private var speakerMonitorEnabled = true
+
+
     override fun prepare(
         sampleRate: Int,
         channels: Int,
@@ -96,11 +102,17 @@ class OpenSlLiveAudioEngine : LiveAudioEngine {
         prepared = false
         looping = false
         pcmListener = null
+        onMixedPcmListener = null
     }
 
     override fun setOnPcmCaptured(listener: ((ShortArray, Int) -> Unit)?) {
         pcmListener = listener
     }
+
+    override fun setOnMixedPcm(listener: ((ShortArray, Int) -> Unit)?) {
+        onMixedPcmListener = listener
+    }
+
 
     /**
      * Called from native layer when a PCM buffer has been captured.
@@ -108,6 +120,32 @@ class OpenSlLiveAudioEngine : LiveAudioEngine {
      */
     private fun onPcmCapturedFromNative(data: ShortArray, size: Int) {
         pcmListener?.invoke(data, size)
+    }
+
+    /**
+     * 🔹 Helper for app-side mixing:
+     * After you mix mic + BGM in Kotlin, call this to notify observers.
+     */
+    fun dispatchMixedPcm(buffer: ShortArray, size: Int) {
+        onMixedPcmListener?.invoke(buffer, size)
+    }
+
+    override fun setSpeakerMonitorEnabled(enabled: Boolean) {
+        speakerMonitorEnabled = enabled
+        LogUtil.i(TAG, "setSpeakerMonitorEnabled = $enabled")
+    }
+
+    fun pushMixedPcmToSpeaker(buffer: ShortArray, size: Int) {
+        if (!prepared || nativeHandle == 0L) return
+        if (!speakerMonitorEnabled) return
+        nativePushMixedPcm(nativeHandle, buffer, size)
+    }
+
+    /** feed BGM PCM from FFmpeg decoder. */
+    override fun pushBgmPcm(buffer: ShortArray, size: Int) {
+        if (!prepared || nativeHandle == 0L) return
+        if (size <= 0 || size > buffer.size) return
+        nativePushBgmPcm(nativeHandle, buffer, size)
     }
 
     // -------- JNI native methods --------
@@ -120,4 +158,6 @@ class OpenSlLiveAudioEngine : LiveAudioEngine {
     private external fun nativeStartLiveLoopback(handle: Long)
     private external fun nativeStopLiveLoopback(handle: Long)
     private external fun nativeReleaseLiveEngine(handle: Long)
+    private external fun nativePushBgmPcm(handle: Long, data: ShortArray, size: Int)
+    private external fun nativePushMixedPcm(handle: Long, buffer: ShortArray, size: Int)
 }

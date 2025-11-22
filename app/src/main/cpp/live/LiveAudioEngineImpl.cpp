@@ -3,6 +3,7 @@
 //
 
 #include "LiveAudioEngineImpl.h"
+#include "CommonTools.h"
 
 LiveAudioEngineImpl::LiveAudioEngineImpl(
         int sampleRate,
@@ -305,6 +306,13 @@ void LiveAudioEngineImpl::destroyAll() {
             env->DeleteGlobalRef(jEngineObjGlobal_);
         }
     }
+
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    while (!playerBuffers_.empty()) {
+        delete[] playerBuffers_.front();
+        playerBuffers_.pop_front();
+    }
+
     jEngineObjGlobal_ = nullptr;
     jvm_ = nullptr;
 }
@@ -378,57 +386,51 @@ void LiveAudioEngineImpl::PlayerCallback(
 }
 
 void LiveAudioEngineImpl::handleRecorderCallback() {
-    if (!running_.load()) {
-        // Still need to re-enqueue buffer so recorder can continue if restarted
-        const SLuint32 bufferSizeBytes =
-                static_cast<SLuint32>(buffers_[currentRecordBufferIndex_].size() * sizeof(short));
+    const int idx = currentRecordBufferIndex_;
+    auto& buf = buffers_[idx];
+    const int samples = static_cast<int>(buf.size()); // shorts (mono)
 
+    const SLuint32 bufferSizeBytes =
+            static_cast<SLuint32>(samples * sizeof(short));
+
+    if (!running_.load()) {
+        // Just keep the recorder running by re-enqueueing this buffer.
         if (recorderQueueItf_) {
             (*recorderQueueItf_)->Enqueue(
                     recorderQueueItf_,
-                    buffers_[currentRecordBufferIndex_].data(),
+                    buf.data(),
                     bufferSizeBytes
             );
         }
-
         currentRecordBufferIndex_ =
                 (currentRecordBufferIndex_ + 1) % kBufferCount;
         return;
     }
 
-    const int idx = currentRecordBufferIndex_;
-    auto& buf = buffers_[idx];
-    const int samples = static_cast<int>(buf.size());
-
-    // 1) enqueue to player
-    if (playerQueueItf_) {
-        (*playerQueueItf_)->Enqueue(
-                playerQueueItf_,
-                buf.data(),
-                static_cast<SLuint32>(samples * sizeof(short))
-        );
-    }
-
-    // 2) send to Java (for visualization / streaming)
+    // 1) send MIC PCM to Java (for mixing with BGM)
     dispatchPcmToJava(buf.data(), samples);
 
-    // 3) re-enqueue for next recording
+    // 2) immediately re-enqueue this buffer for the next capture
     if (recorderQueueItf_) {
         (*recorderQueueItf_)->Enqueue(
                 recorderQueueItf_,
                 buf.data(),
-                static_cast<SLuint32>(samples * sizeof(short))
+                bufferSizeBytes
         );
     }
 
-    // Move to next buffer in ring
     currentRecordBufferIndex_ =
             (currentRecordBufferIndex_ + 1) % kBufferCount;
 }
 
 void LiveAudioEngineImpl::handlePlayerCallback() {
-    // For simple mic→speaker loopback we don't need to do anything here.
-    // The recorder callback is the one that feeds the player queue.
+    // Called when OpenSL has finished with one buffer
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    if (!playerBuffers_.empty()) {
+        short* ptr = playerBuffers_.front();
+        playerBuffers_.pop_front();
+        delete[] ptr;
+    }
 }
 
 // ---- Java callback (Kotlin: onPcmCapturedFromNative) ----
@@ -481,4 +483,32 @@ void LiveAudioEngineImpl::dispatchPcmToJava(short* buffer, int samples) {
     if (needDetach) {
         jvm_->DetachCurrentThread();
     }
+}
+
+void LiveAudioEngineImpl::pushBgmPcm(const short* data, int samples) {
+    if (!data || samples <= 0 || bgmBuffer_.empty()) return;
+
+    std::lock_guard<std::mutex> lock(bgmMutex_);
+
+    const size_t capacity = bgmBuffer_.size();
+    for (int i = 0; i < samples; ++i) {
+        bgmBuffer_[bgmWritePos_] = data[i];
+        bgmWritePos_ = (bgmWritePos_ + 1) % capacity;
+
+        // Simple overwrite if full (drop oldest)
+        if (bgmWritePos_ == bgmReadPos_) {
+            bgmReadPos_ = (bgmReadPos_ + 1) % capacity;
+        }
+    }
+}
+
+void LiveAudioEngineImpl::pushMixedPcm(const short *buffer, int samples) {
+    if (!running_.load() || !playerQueueItf_) return;
+
+    SLuint32 bytes = static_cast<SLuint32>(samples * sizeof(short));
+    (*playerQueueItf_)->Enqueue(
+            playerQueueItf_,
+            buffer,
+            bytes
+    );
 }

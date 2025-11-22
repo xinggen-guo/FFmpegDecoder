@@ -68,11 +68,11 @@ int AudioDecoder::initAudioDecoder(const char *string) {
     duration = static_cast<int>(durationUs / 1000); // ms
 
     LOGI("initAudioDecoder---->sampleRate:%d---->packetBufferSize(samples):%d---->"
-         "frame_size:%d--->duration(ms):%lld",
+         "frame_size:%d--->duration(ms):%lld----chanels:%d",
          sampleRate,
          packetBufferSize,
          avCodecContext->frame_size,
-         (long long)duration);
+         (long long) duration, channels);
 
     // resample if needed
     if (!audioCodecIsSupported()) {

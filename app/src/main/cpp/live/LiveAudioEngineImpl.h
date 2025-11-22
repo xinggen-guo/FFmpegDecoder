@@ -10,6 +10,8 @@
 #include <cstring>
 #include <atomic>
 #include <vector>
+#include <mutex>
+#include <deque>
 
 // Mic → Speaker loopback using OpenSL ES, with PCM callback to Kotlin.
 class LiveAudioEngineImpl {
@@ -21,6 +23,10 @@ public:
     void startLoopback();
     void stopLoopback();
 
+    /** BGM PCM input from FFmpeg PCM path */
+    void pushBgmPcm(const short* buffer, int samples);
+
+    void pushMixedPcm(const short* buffer, int samples);
 private:
     void initOpenSL();
     void createOutputMix();
@@ -72,4 +78,14 @@ private:
 
     // State
     std::atomic<bool> running_{false};
+
+    // NEW: BGM ring buffer ----------
+    std::vector<short> bgmBuffer_;
+    size_t bgmWritePos_ = 0;
+    size_t bgmReadPos_  = 0;
+    std::mutex bgmMutex_;
+
+    //  player buffer management for mixed PCM
+    std::mutex playerMutex_;
+    std::deque<short*> playerBuffers_;  // pointers to delete in callback
 };

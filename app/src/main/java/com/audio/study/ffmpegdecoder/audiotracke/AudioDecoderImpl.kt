@@ -2,8 +2,11 @@ package com.audio.study.ffmpegdecoder.audiotracke
 
 class AudioDecoderImpl : AudioDecoder {
 
-    override fun init(accompanyPath: String?, packetBufferTimePercent: Float) {
 
+    private var pcmListener: ((ShortArray, Int) -> Unit)? = null
+
+    override fun setOnPcmDecoded(listener: ((ShortArray, Int) -> Unit)?) {
+        pcmListener = listener
     }
 
     override fun destory() {
@@ -11,15 +14,19 @@ class AudioDecoderImpl : AudioDecoder {
     }
 
     override fun readSamples(samples: ShortArray): Int {
-        return readSamples(samples,samples.size)
+        val ret = readSamples(samples, samples.size)
+        if (ret > 0) {
+            pcmListener?.invoke(samples, ret)
+        }
+        return ret
     }
 
     override fun getMusicMetaByPath(musicPath: String, metaArray: IntArray): Boolean {
         return getMusicMeta(musicPath, metaArray)
     }
 
-    override fun prepare(musicPath: String) {
-        prepareDecoder(musicPath)
+    override fun prepare(musicPath: String): Boolean {
+        return prepareDecoder(musicPath)
     }
 
     override fun getProgress(): Long {
@@ -38,7 +45,7 @@ class AudioDecoderImpl : AudioDecoder {
 
     private external fun closeFile()
 
-    private external fun prepareDecoder(musicPath: String)
+    private external fun prepareDecoder(musicPath: String): Boolean
 
     private external fun nativeSeekPlay(seekPosition: Long)
 }

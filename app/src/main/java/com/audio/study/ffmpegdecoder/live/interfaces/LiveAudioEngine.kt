@@ -40,4 +40,12 @@ interface LiveAudioEngine {
      *  - mixing BGM + mic
      */
     fun setOnPcmCaptured(listener: ((buffer: ShortArray, size: Int) -> Unit)?)
+
+    fun setOnMixedPcm(listener: ((ShortArray, Int) -> Unit)?)    // NEW callback
+
+    /** Feed decoded BGM PCM (from FFmpeg) into live engine. */
+    fun pushBgmPcm(buffer: ShortArray, size: Int)
+
+    /** Enable/disable sending mixed audio to speaker (monitor / earback). */
+    fun setSpeakerMonitorEnabled(enabled: Boolean)
 }

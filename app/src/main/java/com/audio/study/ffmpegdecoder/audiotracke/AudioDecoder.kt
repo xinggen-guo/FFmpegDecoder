@@ -2,15 +2,16 @@ package com.audio.study.ffmpegdecoder.audiotracke
 
 interface AudioDecoder {
 
-    fun init(accompanyPath: String?, packetBufferTimePercent: Float)
-
     fun destory()
+
+    /** optional PCM callback (called after readSamples succeeds). */
+    fun setOnPcmDecoded(listener: ((ShortArray, Int) -> Unit)?)
 
     fun readSamples(samples: ShortArray): Int
 
     fun getMusicMetaByPath(musicPath: String, metaArray: IntArray):Boolean
 
-    fun prepare(musicPath: String)
+    fun prepare(musicPath: String): Boolean
 
     fun seek(seekPosition: Long)
 

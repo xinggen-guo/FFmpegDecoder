@@ -77,5 +77,11 @@ inline void convertByteArrayFromShortArray(SInt16 *shortarray, int size, byte *b
     delete[] tmpbytearray;
 }
 
+static inline short saturateAdd(short a, short b) {
+    int s = static_cast<int>(a) + static_cast<int>(b);
+    if (s > 32767) s = 32767;
+    if (s < -32768) s = -32768;
+    return static_cast<short>(s);
+}
 
 #endif //FFMPEGDECODER_COMMONTOOLS_H
