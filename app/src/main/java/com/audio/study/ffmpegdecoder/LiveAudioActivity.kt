@@ -75,7 +75,6 @@ class LiveAudioActivity : ComponentActivity() {
 
             val metaArray = intArrayOf(0, 0, 0)
             bgmDecoder.getMusicMetaByPath(path, metaArray)
-
             binding.tvStatus.text = if (!path.isNullOrEmpty()) {
                 "BGM: $path"
             } else {
@@ -136,13 +135,6 @@ class LiveAudioActivity : ComponentActivity() {
     }
 
     private fun setupAndStart() {
-        val path = bgmPath
-        if (path.isNullOrEmpty()) {
-            binding.tvStatus.text = "No BGM selected"
-            return
-        }
-
-        liveEngine.setSpeakerMonitorEnabled(true)
 
         // 1) live engine
         val ok = liveEngine.prepare(
@@ -155,12 +147,15 @@ class LiveAudioActivity : ComponentActivity() {
             return
         }
 
-
-        // 2) BGM decoder
-        val bgmOk = bgmDecoder.prepare(path)
-        if (!bgmOk) {
-            binding.tvStatus.text = "BGM decode prepare failed"
-            return
+        val path = bgmPath
+        if (!path.isNullOrEmpty()) {
+            val bgmOk = bgmDecoder.prepare(path)
+            if (!bgmOk) {
+                binding.tvStatus.text = "BGM decode prepare failed"
+                return
+            }
+        } else {
+            binding.tvStatus.text = "No BGM selected"
         }
 
         try {
@@ -178,11 +173,9 @@ class LiveAudioActivity : ComponentActivity() {
             // TODO: send over network / save file, etc.
         }
 
-        // 3) MIC callback – we do ALL mixing here
         // 3) MIC callback – ALL mixing here
         liveEngine.setOnPcmCaptured { micPcm, micSize ->
             // micSize: mono samples (44.1kHz, ~20ms)
-
             val micFrames = micSize                           // 1 frame = 1 mono sample
             val neededBgmShorts = micFrames * 2               // BGM is stereo → need L+R per frame
 
@@ -221,9 +214,7 @@ class LiveAudioActivity : ComponentActivity() {
             // 3) Send mixed PCM to user listener + speaker
             // ----------------------------------------------------------
             liveEngine.dispatchMixedPcm(mixedBuffer, framesToMix)
-
             wavWriter?.writeSamples(mixedBuffer, framesToMix)
-
             liveEngine.pushMixedPcmToSpeaker(mixedBuffer, framesToMix)
 
             // ----------------------------------------------------------
