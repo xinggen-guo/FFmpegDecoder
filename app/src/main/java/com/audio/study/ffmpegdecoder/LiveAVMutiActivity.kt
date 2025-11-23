@@ -9,20 +9,24 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.audio.study.ffmpegdecoder.audiotracke.AudioDecoderImpl
 import com.audio.study.ffmpegdecoder.databinding.ActivityLiveAudioBinding
+import com.audio.study.ffmpegdecoder.live.engine.CameraVideoRecorder
 import com.audio.study.ffmpegdecoder.live.engine.OpenSlLiveAudioEngine
+import com.audio.study.ffmpegdecoder.utils.AvFileMixer
 import com.audio.study.ffmpegdecoder.utils.FileUtil
+import com.audio.study.ffmpegdecoder.utils.ToastUtils
 import com.audio.study.ffmpegdecoder.utils.WavWriter
 import java.io.File
 
-class LiveAudioActivity : ComponentActivity() {
+class LiveAVMutiActivity : ComponentActivity() {
 
     private lateinit var binding: ActivityLiveAudioBinding
 
     private val liveEngine = OpenSlLiveAudioEngine()
     private val bgmDecoder = AudioDecoderImpl()
 
-    // --- WAV recording state ---
+    private lateinit var videoRecorder: CameraVideoRecorder
 
+    // --- WAV recording state ---
     private var wavWriter: WavWriter? = null
 
     private var totalPcmBytes: Long = 0
@@ -51,14 +55,22 @@ class LiveAudioActivity : ComponentActivity() {
     // mixed output (mono, because mic is mono)
     private val mixedBuffer = ShortArray(4096)
 
-    private val requestMicPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                setupAndStart()
-            } else {
-                binding.tvStatus.text = "Status: mic permission denied"
-            }
+    private var audioFile: File? = null
+    private var videoFile: File? = null
+
+    private val permissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val cameraGranted = result[Manifest.permission.CAMERA] == true
+        val audioGranted = result[Manifest.permission.RECORD_AUDIO] == true
+
+        if (cameraGranted && audioGranted) {
+            // ✅ All permissions granted → start both audio and video
+            startAudioAndVideo()
+        } else {
+            ToastUtils.showShort("Camera and microphone permissions are required")
         }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,8 +78,17 @@ class LiveAudioActivity : ComponentActivity() {
         binding = ActivityLiveAudioBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.btnStart.setOnClickListener { startLive() }
-        binding.btnStop.setOnClickListener { stopLive() }
+        binding.btnStart.setOnClickListener {
+            checkPermissionsAndStart()
+        }
+        binding.btnStop.setOnClickListener {
+            stopLive()
+            videoRecorder.stop()
+        }
+
+        binding.btnMerge.setOnClickListener {
+            doMixWithProgress()
+        }
 
         binding.btnSetBgmPath.setOnClickListener {
             val path = FileUtil.getTheAudioPath(this)
@@ -83,6 +104,36 @@ class LiveAudioActivity : ComponentActivity() {
         }
 
         setGain()
+
+        videoRecorder = CameraVideoRecorder(this)
+    }
+
+    private fun doMixWithProgress() {
+
+        if(videoFile?.exists() == false){
+            binding.tvStatus.text = "this video doesn't exist"
+            return
+        }
+
+        if(audioFile?.exists() == false){
+            binding.tvStatus.text = "this audio doesn't exist"
+            return
+        }
+
+        Thread {
+            val outputFile = File(FileUtil.getFileExternalCachePath(this), "mix_${System.currentTimeMillis()}.mp4")
+            AvFileMixer.mixFiles(videoFile!!, audioFile!!, outputFile) { progress ->
+                runOnUiThread {
+                    // progress: 0f..1f
+                    val percent = (progress * 100).toInt()
+                    binding.tvStatus.text = "Merging... $percent%"
+                }
+            }
+
+            runOnUiThread {
+                binding.tvStatus.text = "Done: ${outputFile.absolutePath}"
+            }
+        }.start()
     }
 
     private fun setGain() {
@@ -124,13 +175,51 @@ class LiveAudioActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopLive()
+        videoRecorder.stop()
+    }
+
+    private fun startVideo() {
+        videoFile = File(FileUtil.getFileExternalCachePath(this), "live_video_${System.currentTimeMillis()}.mp4")
+        videoFile?.let {
+            // Here we assume you add a TextureView in ActivityLiveAudioBinding, e.g. previewView
+            videoRecorder.start(binding.previewView, it)
+        }
+    }
+
+    private fun checkPermissionsAndStart() {
+        val missing = mutableListOf<String>()
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing += Manifest.permission.CAMERA
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            missing += Manifest.permission.RECORD_AUDIO
+        }
+
+        if (missing.isEmpty()) {
+            // ✅ Already have BOTH permissions
+            startAudioAndVideo()
+        } else {
+            // 🔁 Ask for all missing permissions at once
+            permissionsLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun startAudioAndVideo() {
+        startLive()
+        startVideo()
     }
 
     private fun startLive() {
-        if (!hasMicPermission()) {
-            requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
-            return
-        }
         setupAndStart()
     }
 
@@ -160,6 +249,7 @@ class LiveAudioActivity : ComponentActivity() {
 
         try {
             val output = File(FileUtil.getFileExternalCachePath(this), "mixed_record_${System.currentTimeMillis()}.wav")
+            audioFile = output
             wavWriter = WavWriter(output, recordSampleRate, recordChannels, recordBitsPerSample)
             wavWriter?.start()
 
@@ -254,12 +344,6 @@ class LiveAudioActivity : ComponentActivity() {
         binding.progressLevel.progress = 0
     }
 
-    private fun hasMicPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
     // --------------------------------------------------------------
     // pushBgmToRing: append `size` shorts from decoder into ring

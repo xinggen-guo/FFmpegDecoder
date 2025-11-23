@@ -5,8 +5,14 @@
     <uses-feature
         android:glEsVersion="0x00030002"
         android:required="true" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
     
     <!-- Mic permission -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
     <application
@@ -56,10 +62,15 @@
             android:exported="false" />
         
         <activity
-            android:name=".LiveAudioActivity"
+            android:name=".LiveAVMutiActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:label="Live Audio Demo" />
+        <activity
+            android:name=".AvRecordActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:label="AvRecordActivity" />
     </application>
 
 </manifest>

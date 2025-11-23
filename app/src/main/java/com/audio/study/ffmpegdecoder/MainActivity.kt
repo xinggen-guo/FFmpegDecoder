@@ -54,7 +54,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, XMediaPlayerActivity::class.java))
         }
         binding.LiveAudioSample.setOnClickListener {
-            startActivity(Intent(this, LiveAudioActivity::class.java))
+            startActivity(Intent(this, LiveAVMutiActivity::class.java))
+        }
+        binding.AvRecord.setOnClickListener {
+            startActivity(Intent(this, AvRecordActivity::class.java))
         }
     }
 
