@@ -59,6 +59,9 @@ class MainActivity : AppCompatActivity() {
         binding.AvRecord.setOnClickListener {
             startActivity(Intent(this, AvRecordActivity::class.java))
         }
+        binding.LiveStreamActivity.setOnClickListener {
+            startActivity(Intent(this, LiveStreamActivity::class.java))
+        }
     }
 
     /**

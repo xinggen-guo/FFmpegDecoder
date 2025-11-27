@@ -94,6 +94,16 @@
         android:text="AvRecord"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/XMediaPlayerSample" />
+        app:layout_constraintTop_toBottomOf="@id/LiveAudioSample" />
+    
+    <Button
+        android:id="@+id/LiveStreamActivity"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAllCaps="false"
+        android:text="LiveStreamActivity"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/AvRecord" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

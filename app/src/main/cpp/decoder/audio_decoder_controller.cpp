@@ -66,7 +66,7 @@ void AudioDecoderController::seek(const long seek_time) {
         return;
     }
 
-    if(!isRunning){
+    if (!isRunning) {
         LOGI("seek: decoder thread is not running, restart it");
         initDecoderThread();   // re-create mutex/cond + thread
     }
@@ -99,60 +99,22 @@ int AudioDecoderController::readSamples(short *samples, int size) {
     LOGI("readSamples");
 
     int result = 0;
-    if (!audioFrameQueue.empty() && !needSeek) {
-        PcmFrame *audioPacket = audioFrameQueue.front();
-        if (audioPacket->audioSize == -1) {
-            // EOF / error
-            result = MEDIA_STATUS_ERROR;
-        } else {
-            // audioSize is number of samples (shorts)
-            const int packetSamples = audioPacket->audioSize;
+    PcmFrame *audioPacket = nullptr;
 
-            if (size < packetSamples) {
-                // Safety check: caller buffer too small
-                LOGE("readSamples: caller buffer too small. size=%d packetSamples=%d",
-                     size, packetSamples);
-            }
+    // ---- 1) Take one packet from queue under lock ----
+    pthread_mutex_lock(&mLock);
 
-            short *dataSamples = audioPacket->audioBuffer;
-            memcpy(samples, dataSamples,
-                   packetSamples * sizeof(short));
+    bool localNeedSeek = needSeek;
+    if (!audioFrameQueue.empty() && !localNeedSeek) {
+        audioPacket = audioFrameQueue.front();
+        audioFrameQueue.pop();
 
-            // Base PTS in ms: startPosition is seconds (float)
-            int64_t baseMs = (int64_t)(audioPacket->startPosition * 1000.0f + 0.5f);
-
-            // Duration of this packet in ms
-            int channels   = audioDecoder->getChannels();
-            int sampleRate = audioDecoder->getSampleRate();
-            int samplesPerChannel = (channels > 0)
-                                    ? (packetSamples / channels)
-                                    : packetSamples;
-
-            int packetMs = 0;
-            if (sampleRate > 0) {
-                packetMs = (int)((int64_t)samplesPerChannel * 1000 / sampleRate);
-            }
-
-            // Update global "progress" (UI timeline)
-            progressMs = baseMs;
-
-            // Update clock state used by getAudioClockMs()
-            audioClockStartMs     = baseMs;
-            audioClockUpdateMs    = nowMonotonicMs();  // monotonic time now
-            lastBufferDurationMs  = packetMs;
-
-            audioFrameQueue.pop();
-            result = packetSamples;
-
-            if (visualizerEnabled) {
-                AudioVisualizer::instance().onPcmData(
-                        dataSamples,
-                        packetSamples,
-                        audioDecoder->getSampleRate());
-            }
+        // If queue is going low, wake decoder thread (to refill)
+        if (audioFrameQueue.size() < QUEUE_SIZE_MIN_THRESHOLD && isRunning) {
+            pthread_cond_signal(&mCondition);
         }
-        delete audioPacket;
     } else {
+        // No packet to consume
         if (isRunning || needSeek) {
             result = MEDIA_STATUS_BUFFERING;
         } else {
@@ -161,15 +123,65 @@ int AudioDecoderController::readSamples(short *samples, int size) {
         }
     }
 
-    // If queue is going low, wake decoder thread (to refill)
-    if (audioFrameQueue.size() < QUEUE_SIZE_MIN_THRESHOLD && isRunning) {
-        int getLockCode = pthread_mutex_lock(&mLock);
-        (void)getLockCode;
-        if (result != -1) {
-            pthread_cond_signal(&mCondition);
-        }
-        pthread_mutex_unlock(&mLock);
+    pthread_mutex_unlock(&mLock);
+    // ---- end of queue critical section ----
+
+    if (!audioPacket) {
+        // No audioPacket pulled -> return status decided above
+        return result;
     }
+
+    // ---- 2) Use the packet outside the lock ----
+    if (audioPacket->audioSize == -1) {
+        // EOF / error
+        result = MEDIA_STATUS_ERROR;
+        delete audioPacket;
+        return result;
+    }
+
+    // audioSize is number of samples (shorts)
+    const int packetSamples = audioPacket->audioSize;
+    if (size < packetSamples) {
+        // Safety check: caller buffer too small
+        LOGE("readSamples: caller buffer too small. size=%d packetSamples=%d",
+             size, packetSamples);
+    }
+
+    short *dataSamples = audioPacket->audioBuffer;
+    memcpy(samples, dataSamples, packetSamples * sizeof(short));
+
+    // Base PTS in ms: startPosition is seconds (float)
+    int64_t baseMs = (int64_t)(audioPacket->startPosition * 1000.0f + 0.5f);
+
+    // Duration of this packet in ms
+    int channels   = audioDecoder->getChannels();
+    int sampleRate = audioDecoder->getSampleRate();
+    int samplesPerChannel = (channels > 0)
+                            ? (packetSamples / channels)
+                            : packetSamples;
+
+    int packetMs = 0;
+    if (sampleRate > 0) {
+        packetMs = (int)((int64_t)samplesPerChannel * 1000 / sampleRate);
+    }
+
+    // Update global "progress" (UI timeline)
+    progressMs = baseMs;
+
+    // Update clock state used by getAudioClockMs()
+    audioClockStartMs     = baseMs;
+    audioClockUpdateMs    = nowMonotonicMs();  // monotonic time now
+    lastBufferDurationMs  = packetMs;
+
+    if (visualizerEnabled) {
+        AudioVisualizer::instance().onPcmData(
+                dataSamples,
+                packetSamples,
+                audioDecoder->getSampleRate());
+    }
+
+    delete audioPacket;
+    result = packetSamples;
     return result;
 }
 
@@ -198,11 +210,17 @@ void AudioDecoderController::destroy() {
         }
     }
 
-    // 3) Clean remaining packets in queue (optional but good hygiene)
+    // 3) Clean remaining packets in queue
+    if (mutexValid) {
+        pthread_mutex_lock(&mLock);
+    }
     while (!audioFrameQueue.empty()) {
         PcmFrame* packet = audioFrameQueue.front();
         audioFrameQueue.pop();
         delete packet;
+    }
+    if (mutexValid) {
+        pthread_mutex_unlock(&mLock);
     }
 
     // 4) Destroy underlying decoder
@@ -220,7 +238,6 @@ void AudioDecoderController::destroy() {
     }
 
     LOGI("destroy -- done");
-
 }
 
 void AudioDecoderController::initDecoderThread() {
@@ -237,25 +254,43 @@ void AudioDecoderController::initDecoderThread() {
 void* AudioDecoderController::startDecoderThread(void *ptr) {
     auto *decoderController = (AudioDecoderController *) ptr;
 
-    int getLockCode = pthread_mutex_lock(&decoderController->mLock);
-    (void)getLockCode;
-
     while (decoderController->isRunning) {
-        if (decoderController->needSeek) {
-            if (decoderController->seekTime >= 0) {
-                int dataSize = (int)decoderController->audioFrameQueue.size();
-                if (dataSize > 0) {
-                    for (int i = 0; i < dataSize; i++) {
-                        PcmFrame *audioPacket =
-                                decoderController->audioFrameQueue.front();
-                        decoderController->audioFrameQueue.pop();
-                        delete audioPacket;
-                    }
-                }
 
-                decoderController->audioDecoder->seek(decoderController->seekTime);
-                decoderController->seekTime = -1;
+        long localSeekTime = -1;
+
+        pthread_mutex_lock(&decoderController->mLock);
+        if (decoderController->needSeek && decoderController->seekTime >= 0) {
+            localSeekTime = decoderController->seekTime;
+
+            while (!decoderController->audioFrameQueue.empty()) {
+                PcmFrame *audioPacket = decoderController->audioFrameQueue.front();
+                decoderController->audioFrameQueue.pop();
+                delete audioPacket;
             }
+
+            decoderController->seekTime = -1;
+            decoderController->needSeek = false;
+        }
+        pthread_mutex_unlock(&decoderController->mLock);
+
+        if (localSeekTime >= 0) {
+            // Perform seek outside the lock (can be slow)
+            decoderController->audioDecoder->seek(localSeekTime);
+            continue; // then continue decoding
+        }
+
+        pthread_mutex_lock(&decoderController->mLock);
+        while (decoderController->isRunning &&
+               decoderController->audioFrameQueue.size() >= QUEUE_SIZE_MAX_THRESHOLD &&
+               !decoderController->needSeek) {
+            pthread_cond_wait(&decoderController->mCondition,
+                              &decoderController->mLock);
+        }
+        bool stillRunning = decoderController->isRunning;
+        pthread_mutex_unlock(&decoderController->mLock);
+
+        if (!stillRunning) {
+            break;
         }
 
         int result = decoderController->decodeSongPacket();
@@ -263,22 +298,10 @@ void* AudioDecoderController::startDecoderThread(void *ptr) {
             // EOF or error
             break;
         }
-
-        if (decoderController->needSeek) {
-            decoderController->needSeek = false;
-        }
-
-        if (decoderController->audioFrameQueue.size() >= QUEUE_SIZE_MAX_THRESHOLD) {
-            // Too many buffers queued, wait until consumer signals
-            pthread_cond_wait(&decoderController->mCondition,
-                              &decoderController->mLock);
-        }
     }
 
     LOGI("startDecoderThread----->exit loop");
     decoderController->isRunning = false;
-    pthread_mutex_unlock(&decoderController->mLock);
-
     pthread_exit(nullptr);
 }
 
@@ -314,7 +337,16 @@ int AudioDecoderController::decodeSongPacket() {
                     audioPacket->audioSize,
                     audioDecoder->getSampleRate());
         }
-        audioFrameQueue.push(audioPacket);
+
+        // Push into queue under lock
+        if (mutexValid) {
+            pthread_mutex_lock(&mLock);
+            audioFrameQueue.push(audioPacket);
+            pthread_mutex_unlock(&mLock);
+        } else {
+            // Fallback, should not really happen if properly initialized
+            audioFrameQueue.push(audioPacket);
+        }
         return 1;
     }
 }

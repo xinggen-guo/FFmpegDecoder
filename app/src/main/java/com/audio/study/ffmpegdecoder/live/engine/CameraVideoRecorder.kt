@@ -4,11 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CameraMetadata
-import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.*
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -19,9 +15,11 @@ import androidx.core.app.ActivityCompat
 import java.io.File
 
 /**
- * @author xinggen.guo
- * @date 2025/11/23 15:24
- * @description
+ * Camera + GL-filtered video recorder.
+ *
+ * Pipeline:
+ *   Camera → cameraSurface (from GlFilterRenderer)
+ *   GlFilterRenderer → encoderSurface (MediaCodec input) + previewSurface (TextureView)
  */
 class CameraVideoRecorder(
     private val context: Context
@@ -30,6 +28,7 @@ class CameraVideoRecorder(
     // Camera2
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
+    private var glRenderer: GlFilterRenderer? = null
 
     // Encoder + muxer
     private var codec: MediaCodec? = null
@@ -39,7 +38,7 @@ class CameraVideoRecorder(
     private var muxerStarted = false
     @Volatile private var running = false
 
-    // Config (you can change from outside if you like)
+    // Config
     var width: Int = 1280
     var height: Int = 720
     var bitRate: Int = 4_000_000
@@ -48,12 +47,6 @@ class CameraVideoRecorder(
     var isRecording: Boolean = false
         private set
 
-    /**
-     * Start recording and preview.
-     *
-     * @param previewView TextureView where the live camera preview is shown.
-     * @param outputFile MP4 file where video will be recorded.
-     */
     fun start(previewView: TextureView, outputFile: File) {
         if (isRecording) return
         isRecording = true
@@ -67,6 +60,7 @@ class CameraVideoRecorder(
                 override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
                     openCameraAndCreateSession(previewView)
                 }
+
                 override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
                 override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
                 override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
@@ -74,16 +68,19 @@ class CameraVideoRecorder(
         }
     }
 
-    /**
-     * Stop recording, stop camera, release resources.
-     */
     fun stop() {
         if (!isRecording) return
         isRecording = false
         running = false
 
+        // stop GL renderer first
+        glRenderer?.stop()
+        glRenderer = null
+
         // signal EOS to encoder
-        codec?.signalEndOfInputStream()
+        try {
+            codec?.signalEndOfInputStream()
+        } catch (_: Exception) {}
 
         // close camera session
         try { captureSession?.close() } catch (_: Exception) {}
@@ -93,7 +90,9 @@ class CameraVideoRecorder(
         cameraDevice = null
     }
 
-    // -------------------- internal: encoder --------------------
+    // --------------------------------------------------
+    // Encoder
+    // --------------------------------------------------
 
     private fun setupVideoEncoder(outputFile: File) {
         val format = MediaFormat.createVideoFormat(
@@ -137,7 +136,7 @@ class CameraVideoRecorder(
                     continue
                 } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     if (muxerStarted) {
-                        // should not happen in normal use
+                        // should not happen
                     }
                     val newFormat = c.outputFormat
                     videoTrackIndex = m.addTrack(newFormat)
@@ -168,7 +167,9 @@ class CameraVideoRecorder(
         }.start()
     }
 
-    // -------------------- internal: camera + preview --------------------
+    // --------------------------------------------------
+    // Camera2 + preview
+    // --------------------------------------------------
 
     private fun openCameraAndCreateSession(previewView: TextureView) {
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -177,7 +178,7 @@ class CameraVideoRecorder(
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            // caller should request permission before calling start()
+            // caller must have requested permission
             return
         }
 
@@ -203,14 +204,23 @@ class CameraVideoRecorder(
         val texture = previewView.surfaceTexture ?: return
         texture.setDefaultBufferSize(width, height)
         val previewSurface = Surface(texture)
+        val encSurface = codecInputSurface ?: return
 
-        val encoderSurface = codecInputSurface ?: return
+//        val renderer = GlFilterRenderer(
+//            encoderSurface = encSurface,
+//            previewSurface = previewSurface,
+//            width = width,
+//            height = height
+//        )
+//        glRenderer = renderer
+//        renderer.start()
+//        val cameraSurface = renderer.getCameraSurfaceBlocking(1000) ?: return
 
-        val surfaces = listOf(previewSurface, encoderSurface)
 
+        val surfaces = listOf(previewSurface,encSurface)
         val requestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
-            addTarget(previewSurface)     // ✅ preview
-            addTarget(encoderSurface)     // ✅ encoder input
+            addTarget(previewSurface)
+            addTarget(encSurface)
             set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
         }
 
@@ -221,10 +231,7 @@ class CameraVideoRecorder(
                     captureSession = session
                     session.setRepeatingRequest(requestBuilder.build(), null, null)
                 }
-
-                override fun onConfigureFailed(session: CameraCaptureSession) {
-                    // handle error if needed
-                }
+                override fun onConfigureFailed(session: CameraCaptureSession) {}
             },
             null
         )

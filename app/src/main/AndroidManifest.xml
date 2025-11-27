@@ -71,6 +71,11 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:label="AvRecordActivity" />
+        <activity
+            android:name=".LiveStreamActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:label="LiveStreamActivity" />
     </application>
 
 </manifest>
