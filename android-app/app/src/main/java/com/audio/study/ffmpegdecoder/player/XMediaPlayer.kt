@@ -120,6 +120,16 @@ class XMediaPlayer(
         return true
     }
 
+
+    /**
+     * Convenience: prepare a live TCP FLV stream.
+     * Example URL: tcp://192.168.0.10:9000
+     */
+    fun prepareLiveTcp(host: String, port: Int): Boolean {
+        val url = "tcp://$host:$port"
+        return prepare(url)
+    }
+
     /** Start playback from current position. */
     fun play() {
         if (!prepared) {

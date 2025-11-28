@@ -3,6 +3,19 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+import java.util.Properties
+
+def localProps = new Properties()
+def localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { stream ->
+        localProps.load(stream)
+    }
+}
+
+def streamHost = localProps.getProperty("stream.host", "127.0.0.1")
+def streamPort = localProps.getProperty("stream.port", "9000")
+
 android {
     compileSdk 31
 
@@ -22,6 +35,9 @@ android {
                 abiFilters  'armeabi-v7a','arm64-v8a'
             }
         }
+
+        buildConfigField "String", "STREAM_HOST", "\"${streamHost}\""
+        buildConfigField "int", "STREAM_PORT", streamPort
     }
 
     buildTypes {

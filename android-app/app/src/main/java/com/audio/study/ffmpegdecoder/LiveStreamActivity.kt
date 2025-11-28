@@ -10,6 +10,7 @@ import com.audio.study.ffmpegdecoder.databinding.ActivityLiveStreamBinding
 import com.audio.study.ffmpegdecoder.live.engine.AvLiveStreamer
 import com.audio.study.ffmpegdecoder.live.engine.FlvMuxSink
 import com.audio.study.ffmpegdecoder.live.interfaces.LiveStreamSink
+import com.audio.study.ffmpegdecoder.net.NetworkFlvSink
 import com.audio.study.ffmpegdecoder.utils.FileUtil
 import java.io.File
 
@@ -22,6 +23,9 @@ class LiveStreamActivity : ComponentActivity() {
 
     private lateinit var binding: ActivityLiveStreamBinding
     private var streamer: AvLiveStreamer? = null
+    private var liveSink: LiveStreamSink? = null
+
+    private var setNetwork = false
 
     private val permissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -46,7 +50,7 @@ class LiveStreamActivity : ComponentActivity() {
         }
 
         binding.btnStopLive.setOnClickListener {
-            streamer?.stop()
+            stopLive()
         }
     }
 
@@ -78,14 +82,29 @@ class LiveStreamActivity : ComponentActivity() {
 
     private fun startStreaming() {
         if (streamer != null && streamer!!.isRecording) return
-        val outputFile = File(FileUtil.getFileExternalCachePath(this), "flv_mux_${System.currentTimeMillis()}.flv")
-        val sink = FlvMuxSink(outputFile.outputStream())
-        streamer = AvLiveStreamer(this, sink)
+        if (setNetwork) {
+            val host = BuildConfig.STREAM_HOST
+            val port = BuildConfig.STREAM_PORT
+            liveSink = NetworkFlvSink(host, port)
+        } else {
+            val outputFile = File(FileUtil.getFileExternalCachePath(this), "flv_mux_${System.currentTimeMillis()}.flv")
+            liveSink = FlvMuxSink(outputFile.outputStream())
+        }
+
+        streamer = AvLiveStreamer(this, liveSink!!)
         streamer!!.start(binding.previewView)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopLive()
+    }
+
+    private fun stopLive() {
         streamer?.stop()
+        streamer = null
+
+        liveSink?.close()
+        liveSink = null
     }
 }
