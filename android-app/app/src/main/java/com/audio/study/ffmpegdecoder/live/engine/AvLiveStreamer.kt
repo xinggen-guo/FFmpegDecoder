@@ -72,6 +72,9 @@ class AvLiveStreamer(
     var frameRate: Int = 30
     var audioBitrate: Int = 128_000
 
+    private var videoPtsBaseUs: Long = -1L
+    private var audioPtsBaseUs: Long = -1L
+
     // --------------------------------------------------
     // Public API
     // --------------------------------------------------
@@ -222,8 +225,10 @@ class AvLiveStreamer(
                                     encoded.limit(bufferInfo.offset + bufferInfo.size)
                                     encoded.get(data)
 
-                                    val ptsUs =
-                                        (System.nanoTime() - startTimeNs) / 1_000L
+                                    val rawPtsUs = bufferInfo.presentationTimeUs
+                                    if (videoPtsBaseUs < 0) videoPtsBaseUs = rawPtsUs
+                                    val ptsUs = rawPtsUs - videoPtsBaseUs
+
                                     val isKeyFrame =
                                         (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
 
@@ -359,12 +364,11 @@ class AvLiveStreamer(
                 // After stop() is called: send EOS
                 val eosIndex = codec.dequeueInputBuffer(10_000)
                 if (eosIndex >= 0) {
-                    val ptsUs = (System.nanoTime() - startTimeNs) / 1_000L
                     codec.queueInputBuffer(
                         eosIndex,
                         0,
                         0,
-                        ptsUs,
+                        0,
                         MediaCodec.BUFFER_FLAG_END_OF_STREAM
                     )
                 }
@@ -402,9 +406,7 @@ class AvLiveStreamer(
         while (true) {
             val outIndex = codec.dequeueOutputBuffer(bufferInfo, 10_000)
             when {
-                outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    break
-                }
+                outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> break
 
                 outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     val format = codec.outputFormat
@@ -422,7 +424,10 @@ class AvLiveStreamer(
                         encoded.limit(bufferInfo.offset + bufferInfo.size)
                         encoded.get(data)
 
-                        val ptsUs = bufferInfo.presentationTimeUs
+                        val rawPtsUs = bufferInfo.presentationTimeUs
+                        if (audioPtsBaseUs < 0) audioPtsBaseUs = rawPtsUs
+                        val ptsUs = rawPtsUs - audioPtsBaseUs
+
                         onFrame(data, ptsUs)
                     }
 

@@ -6,6 +6,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -17,83 +18,152 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  - sends FLV stream (header + tags) over the network
  */
 class NetworkFlvSink(
-    host: String,
-    port: Int,
-    connectTimeoutMs: Int = 5000
+    private val host: String,
+    private val port: Int,
+    private val connectTimeoutMs: Int = 5000
 ) : LiveStreamSink {
 
-    private val closed = AtomicBoolean(false)
+    // ---- internal command model for worker thread ----
+    private sealed interface Command {
+        data class VideoConfig(val sps: ByteArray, val pps: ByteArray) : Command
+        data class VideoFrame(val data: ByteArray, val ptsUs: Long, val isKeyFrame: Boolean) : Command
+        data class AudioConfig(val aacConfig: ByteArray) : Command
+        data class AudioFrame(val data: ByteArray, val ptsUs: Long) : Command
+        object Close : Command
+    }
 
-    private val socket: Socket
-    private val output: OutputStream
-    private val inner: FlvMuxSink
+    private val closed = AtomicBoolean(false)
+    private val queue = LinkedBlockingQueue<Command>()
+
+    // Worker thread + network resources (used only inside worker)
+    private val workerThread: Thread
 
     init {
-        // 1) connect to Go server
-        val s = Socket()
-        s.connect(InetSocketAddress(host, port), connectTimeoutMs)
-        socket = s
-        output = s.getOutputStream()
+        // Start background worker: connects socket lazily and flushes all commands
+        workerThread = Thread({
+            var socket: Socket? = null
+            var output: OutputStream? = null
+            var muxer: FlvMuxSink? = null
 
-        // 2) wrap with existing FlvMuxSink (it writes FLV to this OutputStream)
-        inner = FlvMuxSink(output)
+            try {
+                while (true) {
+                    val cmd = queue.take()
+
+                    if (cmd is Command.Close) {
+                        // graceful shutdown
+                        break
+                    }
+
+                    // lazy connect: only when first command arrives
+                    if (socket == null) {
+                        socket = Socket()
+                        socket!!.connect(InetSocketAddress(host, port), connectTimeoutMs)
+                        output = socket!!.getOutputStream()
+                        muxer = FlvMuxSink(output!!)
+                    }
+
+                    try {
+                        when (cmd) {
+                            is Command.VideoConfig ->
+                                muxer!!.onVideoConfig(cmd.sps, cmd.pps)
+
+                            is Command.VideoFrame ->
+                                muxer!!.onVideoFrame(cmd.data, cmd.ptsUs, cmd.isKeyFrame)
+
+                            is Command.AudioConfig ->
+                                muxer!!.onAudioConfig(cmd.aacConfig)
+
+                            is Command.AudioFrame ->
+                                muxer!!.onAudioFrame(cmd.data, cmd.ptsUs)
+
+                            Command.Close -> {
+                                // already handled above, unreachable here
+                            }
+                        }
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                        // On any I/O error, stop streaming and exit worker
+                        break
+                    }
+                }
+            } catch (e: InterruptedException) {
+                // thread interrupted, just exit
+            } finally {
+                try {
+                    muxer?.close()
+                } catch (_: Exception) {
+                }
+                try {
+                    output?.close()
+                } catch (_: Exception) {
+                }
+                try {
+                    socket?.close()
+                } catch (_: Exception) {
+                }
+            }
+        }, "NetworkFlvSink-Worker")
+
+        workerThread.start()
     }
+
+    // --------------------------------------------------
+    // LiveStreamSink implementation (called from encoder threads)
+    // --------------------------------------------------
 
     override fun onVideoConfig(sps: ByteArray, pps: ByteArray) {
         if (closed.get()) return
-        try {
-            inner.onVideoConfig(sps, pps)
-        } catch (e: IOException) {
-            handleError(e)
-        }
+        // copy arrays to avoid reuse bugs
+        queue.offer(
+            Command.VideoConfig(
+                sps.copyOf(),
+                pps.copyOf()
+            )
+        )
     }
 
     override fun onVideoFrame(data: ByteArray, ptsUs: Long, isKeyFrame: Boolean) {
         if (closed.get()) return
-        try {
-            inner.onVideoFrame(data, ptsUs, isKeyFrame)
-        } catch (e: IOException) {
-            handleError(e)
-        }
+        queue.offer(
+            Command.VideoFrame(
+                data.copyOf(),
+                ptsUs,
+                isKeyFrame
+            )
+        )
     }
 
     override fun onAudioConfig(aacConfig: ByteArray) {
         if (closed.get()) return
-        try {
-            inner.onAudioConfig(aacConfig)
-        } catch (e: IOException) {
-            handleError(e)
-        }
+        queue.offer(
+            Command.AudioConfig(
+                aacConfig.copyOf()
+            )
+        )
     }
 
     override fun onAudioFrame(data: ByteArray, ptsUs: Long) {
         if (closed.get()) return
-        try {
-            inner.onAudioFrame(data, ptsUs)
-        } catch (e: IOException) {
-            handleError(e)
-        }
+        queue.offer(
+            Command.AudioFrame(
+                data.copyOf(),
+                ptsUs
+            )
+        )
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
 
-        try {
-            inner.close()   // flush + close OutputStream
-        } catch (_: Exception) { }
+        // Send Close command to stop worker
+        queue.offer(Command.Close)
 
         try {
-            output.close()
-        } catch (_: Exception) { }
-
-        try {
-            socket.close()
-        } catch (_: Exception) { }
+            workerThread.join(1000)
+        } catch (_: InterruptedException) {
+        }
     }
 
-    private fun handleError(e: IOException) {
-        // You can add logging here if you like.
-        // For now, just close everything.
-        close()
-    }
+    // We no longer need a separate handleError(e) because
+    // I/O exceptions are handled inside the worker loop.
 }

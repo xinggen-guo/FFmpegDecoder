@@ -1,0 +1,13 @@
+server:
+  host: "0.0.0.0"
+  port: 9000
+
+tcp:
+  read_timeout_ms: 10000
+  write_timeout_ms: 10000
+
+flv:
+  write_buffer: 4096
+
+log:
+  level: "debug"

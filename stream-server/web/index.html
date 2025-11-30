@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Live FLV Preview</title>
+    <script src="https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js"></script>
+</head>
+<body style="background:#111;color:#eee;">
+<video id="video" controls autoplay muted
+       style="width:80vw;max-width:960px;margin-top:20px;background:black;"></video>
+
+<script>
+    const video = document.getElementById('video');
+    if (flvjs.isSupported()) {
+        const flvPlayer = flvjs.createPlayer({
+            type: 'flv',
+            url: '/live.flv',
+            isLive: true,
+            hasAudio: false,
+            hasVideo: true
+        }, {
+            enableStashBuffer: false,
+            stashInitialSize: 128
+        });
+
+        flvPlayer.attachMediaElement(video);
+        flvPlayer.load();
+
+        video.muted = true; // important for autoplay
+        video.addEventListener('canplay', () => {
+            console.log('video canplay, starting playback at', video.currentTime);
+            video.play().catch(err => console.error('play() error:', err));
+        });
+
+        flvPlayer.on(flvjs.Events.ERROR, (type, detail) => {
+            console.error('FLV error:', type, detail);
+        });
+
+        video.addEventListener('error', () => {
+            const e = video.error;
+            console.error('HTMLMediaElement.error:', e && { code: e.code, message: e.message });
+        });
+    }
+</script>
+</body>
+</html>
