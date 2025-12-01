@@ -226,19 +226,25 @@ class FlvMuxSink(private val output: OutputStream) : LiveStreamSink {
      */
     private fun writeAudioTag(data: ByteArray, timestampMs: Int) {
         if (aacConfig == null) {
-            // We haven't seen config yet; some players require it first.
-            // You could choose to buffer until config arrives.
+            // Ideally, we should have sent AudioSpecificConfig first.
+            // You already do that in onAudioConfig(), so normally this won't happen.
         }
+
+        // Some encoders may output ADTS-framed AAC.
+        // FLV AAC expects raw AAC (no ADTS), so strip header if present.
+        val rawAac = stripAdtsHeaderIfPresent(data)
+        if (rawAac.isEmpty()) return
 
         val soundType = 0 // mono; change to 1 if stereo
         val firstByte = ((10 shl 4) or (3 shl 2) or (1 shl 1) or soundType).toByte()
+        // 10 = AAC, 3 = 44kHz (approx), 1 = 16-bit
 
-        val body = ByteArray(data.size + 2)
+        val body = ByteArray(rawAac.size + 2)
         var i = 0
         body[i++] = firstByte
-        // AACPacketType = 1 (raw frame)
+        // AACPacketType = 1 (raw AAC frame)
         body[i++] = 1
-        System.arraycopy(data, 0, body, i, data.size)
+        System.arraycopy(rawAac, 0, body, i, rawAac.size)
 
         writeTag(tagType = 0x08, timestampMs = timestampMs, body = body)
     }
@@ -425,5 +431,33 @@ class FlvMuxSink(private val output: OutputStream) : LiveStreamSink {
         output.write((value shr 16) and 0xFF)
         output.write((value shr 8) and 0xFF)
         output.write(value and 0xFF)
+    }
+
+    /**
+     * If the AAC frame contains an ADTS header (0xFFF...), strip it.
+     * FLV AAC expects RAW AAC frame data (no ADTS).
+     */
+    private fun stripAdtsHeaderIfPresent(data: ByteArray): ByteArray {
+        if (data.size < 7) return data
+
+        val b0 = data[0].toInt() and 0xFF
+        val b1 = data[1].toInt() and 0xF0
+
+        // ADTS syncword 0xFFF (1111 1111 1111)
+        if (b0 != 0xFF || b1 != 0xF0) {
+            // Not ADTS, return as-is
+            return data
+        }
+
+        // protection_absent bit: 1 means no CRC (header = 7 bytes), 0 means CRC present (header = 9 bytes)
+        val protectionAbsent = data[1].toInt() and 0x01
+        val headerLen = if (protectionAbsent == 0) 9 else 7
+
+        if (data.size <= headerLen) {
+            // Header only, no payload – just return original to avoid crash
+            return data
+        }
+
+        return data.copyOfRange(headerLen, data.size)
     }
 }

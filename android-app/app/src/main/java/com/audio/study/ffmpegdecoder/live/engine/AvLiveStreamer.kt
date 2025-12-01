@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class AvLiveStreamer(
     private val context: Context,
     private val sink: LiveStreamSink,
-    private val sampleRate: Int = 48000,
+    private val sampleRate: Int = 44100,
     private val channelCount: Int = 1
 ) {
 
@@ -72,8 +72,9 @@ class AvLiveStreamer(
     var frameRate: Int = 30
     var audioBitrate: Int = 128_000
 
-    private var videoPtsBaseUs: Long = -1L
-    private var audioPtsBaseUs: Long = -1L
+    // Shared first PTS across both tracks
+    private var videoFrameIndex: Long = 0L
+    private var audioSampleCount: Long = 0L
 
     // --------------------------------------------------
     // Public API
@@ -87,6 +88,10 @@ class AvLiveStreamer(
         isRecording = true
 
         startTimeNs = System.nanoTime()
+        videoFrameIndex = 0L
+        audioSampleCount = 0L
+
+
 
         // 1) Setup encoders
         setupVideoEncoder()
@@ -225,9 +230,8 @@ class AvLiveStreamer(
                                     encoded.limit(bufferInfo.offset + bufferInfo.size)
                                     encoded.get(data)
 
-                                    val rawPtsUs = bufferInfo.presentationTimeUs
-                                    if (videoPtsBaseUs < 0) videoPtsBaseUs = rawPtsUs
-                                    val ptsUs = rawPtsUs - videoPtsBaseUs
+                                    val ptsUs = (videoFrameIndex * 1_000_000L) / frameRate
+                                    videoFrameIndex++
 
                                     val isKeyFrame =
                                         (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
@@ -315,7 +319,7 @@ class AvLiveStreamer(
             val pcmBuffer = ByteArray(4096)
             val bufferInfo = MediaCodec.BufferInfo()
             val inputBuffers = codec.inputBuffers
-
+            val bytesPerSample = 2 // PCM 16-bit
             var aacConfigSent = false
             var aacConfig: ByteArray? = null
 
@@ -326,13 +330,17 @@ class AvLiveStreamer(
                     if (read <= 0) continue
 
                     val inputIndex = codec.dequeueInputBuffer(10_000)
+
+                    val totalSamples = read / bytesPerSample              // all channels
+                    val samplesPerChannel = totalSamples / channelCount   // per-channel samples
+
                     if (inputIndex >= 0) {
                         val inputBuf = inputBuffers[inputIndex]
                         inputBuf.clear()
                         inputBuf.put(pcmBuffer, 0, read)
 
-                        val ptsUs =
-                            (System.nanoTime() - startTimeNs) / 1_000L
+                        val ptsUs = (audioSampleCount * 1_000_000L) / sampleRate
+                        audioSampleCount += samplesPerChannel
 
                         codec.queueInputBuffer(
                             inputIndex,
@@ -412,27 +420,37 @@ class AvLiveStreamer(
                     val format = codec.outputFormat
                     val csd0 = format.getByteBuffer("csd-0")
                     if (csd0 != null) {
+                        // AudioSpecificConfig
                         config = csd0.toByteArray()
                     }
                 }
 
                 outIndex >= 0 -> {
-                    val encoded = codec.getOutputBuffer(outIndex) ?: break
+                    val encoded = codec.getOutputBuffer(outIndex)
+                    if (encoded == null) {
+                        codec.releaseOutputBuffer(outIndex, false)
+                        break
+                    }
+
+                    val flags = bufferInfo.flags
+
+                    // ---- IMPORTANT: skip codec-config buffers as real frames ----
+                    if ((flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        codec.releaseOutputBuffer(outIndex, false)
+                        continue
+                    }
+
                     if (bufferInfo.size > 0) {
                         val data = ByteArray(bufferInfo.size)
                         encoded.position(bufferInfo.offset)
                         encoded.limit(bufferInfo.offset + bufferInfo.size)
                         encoded.get(data)
 
-                        val rawPtsUs = bufferInfo.presentationTimeUs
-                        if (audioPtsBaseUs < 0) audioPtsBaseUs = rawPtsUs
-                        val ptsUs = rawPtsUs - audioPtsBaseUs
-
+                        val ptsUs = bufferInfo.presentationTimeUs
                         onFrame(data, ptsUs)
                     }
 
-                    val eos =
-                        (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+                    val eos = (flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
                     codec.releaseOutputBuffer(outIndex, false)
                     if (eos) break
                 }

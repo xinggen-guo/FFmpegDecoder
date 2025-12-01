@@ -25,7 +25,7 @@ class LiveStreamActivity : ComponentActivity() {
     private var streamer: AvLiveStreamer? = null
     private var liveSink: LiveStreamSink? = null
 
-    private var setNetwork = true
+    private var setNetwork = false
 
     private val permissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
