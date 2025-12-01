@@ -1,221 +1,226 @@
 FFmpegDecoder
 
-A complete end-to-end live streaming system built from scratch — no FFmpeg binary, no RTMP, no WebRTC.
+FFmpegDecoder is an audio/video engineering laboratory project.
 
-This project delivers a fully custom pipeline:
+It began as an exploration of FFmpeg decoding, MediaCodec, audio engines, and AV synchronization.
+Later, it grew into a fully custom live streaming pipeline:
+	•	Android → MediaCodec H.264 + AAC
+	•	Pure Kotlin FLV muxer
+	•	TCP transport (no RTMP, no WebRTC)
+	•	Go streaming server
+	•	Browser playback via flv.js + MSE
 
-📱 Android (Kotlin)
-→ capture camera & microphone
-→ encode to H.264 + AAC
-→ mux to FLV
-→ push stream over TCP
-
-🖥 Go Server
-→ receives FLV stream
-→ serves /live.flv via HTTP
-→ supports browser playback
-
-🌐 Web Player (flv.js)
-
-→ ultra-low-latency playback in browser
-→ uses MSE (MediaSource Extensions)
+This repository documents the entire journey — from decoding videos manually to building a working live streaming system.
 
 ⸻
 
-✨ Features
+📦 Features Overview
 
-Android
-	•	Camera2 capture
-	•	OpenGL beauty rendering (GLSurface + filters)
-	•	MediaCodec hardware encoding
-	•	H.264 SPS/PPS extraction
-	•	AAC AudioSpecificConfig extraction
-	•	Precise timestamp synchronization
-	•	Pure Kotlin FLV muxer (no JNI, no FFmpeg)
-	•	Network streaming via TCP socket
+1. FFmpeg Decoder & Player (Android + Native)
 
-Server
-	•	Pure Go implementation
-	•	Accepts FLV over TCP
-	•	Stores header + metadata + frames
-	•	Serves as HTTP-FLV endpoint (/live.flv)
-	•	Supports multiple HTTP clients
+A complete custom A/V player stack:
 
-Web Player
-	•	flv.js
-	•	Ultra low latency (buffer eliminated)
-	•	Live mode (no seeking)
-	•	Plays H.264 + AAC via MSE
+Video Engines
+	•	FfmpegVideoEngine
+	•	Uses FFmpeg via JNI
+	•	Software H264 decoding
+	•	Renders frames to Surface / OpenGL
+	•	MediaCodecVideoEngine
+	•	Hardware decoding
+	•	Demonstrates codec differences & behavior
+
+Audio Engines
+	•	AudioTrackAudioEngine – plays PCM via AudioTrack
+	•	OpenSlAudioEngine – low-latency OpenSL ES PCM playback
+
+AV Synchronization
+	•	AVSyncEngine
+	•	AvSyncController
+Manages timestamps, clocks, and video/audio drift.
+
+Player Abstraction
+	•	XMediaPlayer
+	•	XMediaPlayerFactory
+A full custom media player architecture.
 
 ⸻
 
-📦 Project Structure
+2. Live Streaming Pipeline (Android → Go → Web)
+
+A minimal but complete streaming system built from scratch.
+
+Android (Live Capture)
+	•	Camera2 + OpenGL preview pipeline
+	•	Video encoding: MediaCodec (H.264)
+	•	Audio encoding: MediaCodec (AAC)
+	•	SPS/PPS extraction
+	•	AudioSpecificConfig extraction
+	•	Precise PTS computation
+	•	Pure Kotlin FLV muxer (no FFmpeg)
+	•	TCP streaming via socket
+
+Key classes:
+
+Component	Class
+Orchestration	AvLiveStreamer
+Video capture → encode	VideoEncoder / Camera2 pipeline
+Audio capture → encode	AudioEncoder
+FLV muxing	FlvMuxSink
+TCP streaming	NetworkFlvSink
+File recording	FlvMuxSink(outputStream)
+
+
+⸻
+
+Go Streaming Server
+
+Located in:
+
+stream-server/
+
+Responsibilities:
+	•	Accept live FLV stream via TCP
+	•	Store metadata + sequence headers
+	•	Serve /live.flv as HTTP-FLV
+	•	Work with flv.js for ultra-low-latency playback
+
+Start it:
+
+cd stream-server
+go run ./cmd/server
+
+
+⸻
+
+Web Player (flv.js + MSE)
+
+Static HTML page:
+
+const player = flvjs.createPlayer({
+    type: 'flv',
+    url: '/live.flv',
+    isLive: true,
+});
+player.attachMediaElement(video);
+player.load();
+player.play();
+
+Open in browser:
+
+http://SERVER_IP:8080
+
+
+⸻
+
+📁 Project Structure
 
 FFmpegDecoder/
 │
-├── android-app/                     # Android live streaming SDK / demo
-│   ├── live/                        # core live capture
-│   │   ├── AvLiveStreamer.kt        # camera + mic → encoder → sink
-│   │   ├── NetworkFlvSink.kt        # TCP FLV sender
-│   │   ├── FlvMuxer.kt              # pure Kotlin FLV writer
-│   │   ├── GlFilterRenderer.kt      # OpenGL beauty filter
-│   └── ...
+├── app/                                # Android app module
+│   ├── ffmpeg/                         # FFmpeg decoding engines
+│   │   ├── FfmpegVideoEngine.kt
+│   │   ├── OpenSlAudioEngine.kt
+│   │   ├── AudioTrackAudioEngine.kt
+│   │   └── Native JNI FFmpeg bindings
+│   │
+│   ├── mediacodec/                     # MediaCodec playback engines
+│   │   ├── MediaCodecVideoEngine.kt
+│   │   └── MediaCodecAudioEngine.kt
+│   │
+│   ├── avsync/                         # AV sync module
+│   │   ├── AVSyncEngine.kt
+│   │   └── AvSyncController.kt
+│   │
+│   ├── live/                           # Live streaming implementation
+│   │   ├── AvLiveStreamer.kt
+│   │   ├── FlvMuxSink.kt
+│   │   ├── NetworkFlvSink.kt
+│   │   └── FLV writer (pure Kotlin)
+│   │
+│   └── ui/                             # Demo activities
+│       ├── LiveStreamActivity.kt
+│       └── FFmpegPlayerActivity.kt
 │
-├── server/                          # Go FLV streaming server
-│   ├── main.go                      # handles push + /live.flv playback
+├── stream-server/                      # Go HTTP-FLV server
+│   ├── cmd/server/main.go
+│   ├── internal/ingest
+│   ├── internal/store
+│   └── internal/httpflv
 │
-└── web-player/                      # Browser HTML5 live player
+└── web-player/                         # Browser player
     ├── index.html
-    ├── flv.min.js
-
-
-⸻
-
-🧱 Architecture Overview
-
-      Android
- ┌─────────────────────┐
- │ Camera2 + MIC        │
- │ MediaCodec H264/AAC  │
- │ FLV Muxer (Kotlin)   │
- └──────────┬──────────┘
-            │ TCP
-            ▼
-      Go Streaming Server
- ┌───────────────────────────┐
- │ Accept FLV Push           │
- │ Serve /live.flv           │
- └──────────┬────────────────┘
-            │ HTTP-FLV
-            ▼
-     Browser (flv.js + MSE)
+    └── flv.min.js
 
 
 ⸻
 
 🚀 Quick Start
 
-1. Start Go Server
+1. Run Go Streaming Server
 
-cd server
-go run main.go
+cd stream-server
+go run ./cmd/server
 
-Server opens:
-	•	TCP FLV input at :6000
-	•	HTTP output at :8080/live.flv
+Default ports:
+	•	TCP ingest: 6000
+	•	HTTP output: 8080 (/live.flv)
 
 ⸻
 
 2. Run Android App
 
-Inside your Kotlin project:
+Configure streaming host:
 
-val streamer = AvLiveStreamer(context, NetworkFlvSink("SERVER_IP", 6000))
+val sink = NetworkFlvSink(BuildConfig.STREAM_HOST, BuildConfig.STREAM_PORT)
+val streamer = AvLiveStreamer(this, sink)
 streamer.start(previewView)
+
+Stop streaming:
+
+streamer.stop()
+sink.close()
 
 
 ⸻
 
-3. Open Web Player
+3. Open Browser Player
 
-Open in browser:
+Visit:
 
 http://SERVER_IP:8080
 
-This loads /web-player/index.html which plays /live.flv.
-
-Player auto-starts:
-
-const player = flvjs.createPlayer({
-    type: 'flv',
-    url: '/live.flv',
-    isLive: true,
-    hasAudio: true,
-    hasVideo: true,
-});
-player.attachMediaElement(video);
-player.load();
-player.play();
-
+The player loads automatically with flv.js tuning for low latency.
 
 ⸻
 
-🌐 Web Player Preview
+📝 Notes on Timestamp Design
 
-(screenshot placeholder – you can upload your image later)
+This project fixes the common FLV/MSE playback errors:
+	•	PIPELINE_ERROR_DECODE
+	•	Large audio timestamp gap detected
+	•	appendBuffer failed
 
-+-------------------------------------------+
-|  ▷   LIVE STREAM                           |
-|  [H264 Video + AAC Audio via MSE]         |
-+-------------------------------------------+
-
-
-⸻
-
-🛠 Developer Notes
-
-Timestamp Rules
-
-This project required extremely careful timestamp design.
-
-Video PTS
-bufferInfo.presentationTimeUs from MediaCodec is used.
-
-val ptsUs = rawPtsUs - videoPtsBaseUs
-
-Audio PTS
-Also uses MediaCodec timestamps (correct).
+Fixes were achieved by:
+	•	Using MediaCodec’s PTS directly
+	•	Independent audio/video base timestamps
+	•	Converting μs → ms when muxing FLV
+	•	Guaranteed monotonic timestamp progression
 
 ⸻
 
-📄 API Overview
-
-LiveStreamSink
-
-Implemented by NetworkFlvSink:
-
-interface LiveStreamSink {
-    fun onVideoConfig(sps: ByteArray, pps: ByteArray)
-    fun onVideoFrame(data: ByteArray, ptsUs: Long, isKeyFrame: Boolean)
-
-    fun onAudioConfig(asc: ByteArray)
-    fun onAudioFrame(data: ByteArray, ptsUs: Long)
-
-    fun close()
-}
-
-
-⸻
-
-🧪 Test: FFprobe Output
-
-The FLV produced should show:
-
-Stream #0:0 Video: h264
-Stream #0:1 Audio: aac
-
-If PTS is broken, browser logs errors like:
-
-PipelineStatus::PIPELINE_ERROR_DECODE
-Large audio timestamp gap detected
-appendBuffer error
-
-These issues are fixed by using MediaCodec timestamps only.
-
-⸻
-
-📅 Roadmap
-	•	Multistream support
-	•	FLV recording on server
-	•	H265 support
-	•	WebRTC output
-	•	RTMP ingest
-	•	Android → SRT streaming
+🛣 Roadmap
+	•	Multi-channel streaming
+	•	Server-side FLV recording
+	•	RTMP ingest mode
+	•	SRT output / relay
+	•	H.265 HEVC live streaming
+	•	Web player UI improvements
+	•	FFmpeg filter graph study modules
 
 ⸻
 
 📜 License
 
-MIT License
+MIT License.
 
 ⸻
