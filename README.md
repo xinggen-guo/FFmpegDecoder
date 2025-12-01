@@ -111,47 +111,46 @@ http://SERVER_IP:8080
 
 
 ⸻
+## 📁 Project Structure
 
-📁 Project Structure
-
+```text
 FFmpegDecoder/
 │
-├── app/                                # Android app module
-│   ├── ffmpeg/                         # FFmpeg decoding engines
+├── android-app/                               # Android app module
+│   ├── ffmpeg/                        # FFmpeg decoding engines
 │   │   ├── FfmpegVideoEngine.kt
 │   │   ├── OpenSlAudioEngine.kt
 │   │   ├── AudioTrackAudioEngine.kt
 │   │   └── Native JNI FFmpeg bindings
 │   │
-│   ├── mediacodec/                     # MediaCodec playback engines
+│   ├── mediacodec/                    # MediaCodec playback engines
 │   │   ├── MediaCodecVideoEngine.kt
 │   │   └── MediaCodecAudioEngine.kt
 │   │
-│   ├── avsync/                         # AV sync module
+│   ├── avsync/                        # AV sync module
 │   │   ├── AVSyncEngine.kt
 │   │   └── AvSyncController.kt
 │   │
-│   ├── live/                           # Live streaming implementation
+│   ├── live/                          # Live streaming implementation
 │   │   ├── AvLiveStreamer.kt
 │   │   ├── FlvMuxSink.kt
 │   │   ├── NetworkFlvSink.kt
 │   │   └── FLV writer (pure Kotlin)
 │   │
-│   └── ui/                             # Demo activities
+│   └── ui/                            # Demo activities
 │       ├── LiveStreamActivity.kt
 │       └── FFmpegPlayerActivity.kt
 │
-├── stream-server/                      # Go HTTP-FLV server
+├── stream-server/                     # Go HTTP-FLV server
 │   ├── cmd/server/main.go
 │   ├── internal/ingest
 │   ├── internal/store
 │   └── internal/httpflv
 │
-└── web-player/                         # Browser player
+└── web-player/                        # Browser player
     ├── index.html
     └── flv.min.js
-
-
+```
 ⸻
 
 🚀 Quick Start
